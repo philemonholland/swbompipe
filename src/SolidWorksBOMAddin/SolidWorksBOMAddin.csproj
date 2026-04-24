@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\BomCore\BomCore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SolidWorks.Interop.sldworks" Version="32.1.0" />
+    <PackageReference Include="SolidWorks.Interop.swconst" Version="32.1.0" />
+    <PackageReference Include="SolidWorks.Interop.swpublished" Version="32.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\profiles\default.pipebom.json" Link="profiles\default.pipebom.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableComHosting>true</EnableComHosting>
+    <AssemblyName>AFCA.PipingBom.Generator</AssemblyName>
+  </PropertyGroup>
+
+</Project>

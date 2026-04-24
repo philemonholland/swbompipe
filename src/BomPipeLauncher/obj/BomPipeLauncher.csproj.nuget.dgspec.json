@@ -1,0 +1,226 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\codebase\\bompipe\\src\\BomPipeLauncher\\BomPipeLauncher.csproj": {}
+  },
+  "projects": {
+    "C:\\codebase\\bompipe\\src\\BomCore\\BomCore.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\codebase\\bompipe\\src\\BomCore\\BomCore.csproj",
+        "projectName": "BomCore",
+        "projectPath": "C:\\codebase\\bompipe\\src\\BomCore\\BomCore.csproj",
+        "packagesPath": "C:\\Users\\gombo\\.nuget\\packages\\",
+        "outputPath": "C:\\codebase\\bompipe\\src\\BomCore\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\gombo\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "ClosedXML": {
+              "target": "Package",
+              "version": "[0.104.2, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\gombo\\.dotnet\\sdk\\8.0.420/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\codebase\\bompipe\\src\\BomPipeLauncher\\BomPipeLauncher.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\codebase\\bompipe\\src\\BomPipeLauncher\\BomPipeLauncher.csproj",
+        "projectName": "BomPipeLauncher",
+        "projectPath": "C:\\codebase\\bompipe\\src\\BomPipeLauncher\\BomPipeLauncher.csproj",
+        "packagesPath": "C:\\Users\\gombo\\.nuget\\packages\\",
+        "outputPath": "C:\\codebase\\bompipe\\src\\BomPipeLauncher\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\gombo\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {
+              "C:\\codebase\\bompipe\\src\\BomCore\\BomCore.csproj": {
+                "projectPath": "C:\\codebase\\bompipe\\src\\BomCore\\BomCore.csproj"
+              },
+              "C:\\codebase\\bompipe\\src\\SolidWorksBOMAddin\\SolidWorksBOMAddin.csproj": {
+                "projectPath": "C:\\codebase\\bompipe\\src\\SolidWorksBOMAddin\\SolidWorksBOMAddin.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "dependencies": {
+            "SolidWorks.Interop.sldworks": {
+              "target": "Package",
+              "version": "[32.1.0, )"
+            },
+            "SolidWorks.Interop.swconst": {
+              "target": "Package",
+              "version": "[32.1.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\gombo\\.dotnet\\sdk\\8.0.420/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\codebase\\bompipe\\src\\SolidWorksBOMAddin\\SolidWorksBOMAddin.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\codebase\\bompipe\\src\\SolidWorksBOMAddin\\SolidWorksBOMAddin.csproj",
+        "projectName": "AFCA.PipingBom.Generator",
+        "projectPath": "C:\\codebase\\bompipe\\src\\SolidWorksBOMAddin\\SolidWorksBOMAddin.csproj",
+        "packagesPath": "C:\\Users\\gombo\\.nuget\\packages\\",
+        "outputPath": "C:\\codebase\\bompipe\\src\\SolidWorksBOMAddin\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\gombo\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {
+              "C:\\codebase\\bompipe\\src\\BomCore\\BomCore.csproj": {
+                "projectPath": "C:\\codebase\\bompipe\\src\\BomCore\\BomCore.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "dependencies": {
+            "SolidWorks.Interop.sldworks": {
+              "target": "Package",
+              "version": "[32.1.0, )"
+            },
+            "SolidWorks.Interop.swconst": {
+              "target": "Package",
+              "version": "[32.1.0, )"
+            },
+            "SolidWorks.Interop.swpublished": {
+              "target": "Package",
+              "version": "[32.1.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            },
+            "Microsoft.WindowsDesktop.App.WindowsForms": {
+              "privateAssets": "none"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\gombo\\.dotnet\\sdk\\8.0.420/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

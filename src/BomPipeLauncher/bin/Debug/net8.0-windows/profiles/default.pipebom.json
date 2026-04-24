@@ -1,0 +1,59 @@
+{
+  "profileName": "AFCA Pipe BOM",
+  "version": 1,
+  "partClassRules": [
+    {
+      "className": "Pipe",
+      "detectWhenPropertyExists": "PipeLength"
+    }
+  ],
+  "pipeColumns": [
+    {
+      "sourceProperty": "BOM",
+      "displayName": "BOM Code",
+      "enabled": true,
+      "groupBy": true,
+      "order": 1
+    },
+    {
+      "sourceProperty": "Pipe Identifier",
+      "displayName": "Pipe Description",
+      "enabled": true,
+      "groupBy": true,
+      "order": 2
+    },
+    {
+      "sourceProperty": "Specification",
+      "displayName": "Specification",
+      "enabled": true,
+      "groupBy": true,
+      "order": 3
+    },
+    {
+      "sourceProperty": "PipeLength",
+      "displayName": "Cut Length",
+      "enabled": true,
+      "groupBy": true,
+      "order": 4,
+      "unit": "in"
+    }
+  ],
+  "accessoryRules": [
+    {
+      "sourceProperty": "NumGaskets",
+      "displayName": "Gaskets",
+      "bomSection": "Pipe Accessories"
+    },
+    {
+      "sourceProperty": "NumClamps",
+      "displayName": "Clamps",
+      "bomSection": "Pipe Accessories"
+    }
+  ],
+  "ignoredProperties": [
+    "BlueGasket",
+    "WhiteGasket",
+    "BlueFerrule",
+    "WhiteFerrule"
+  ]
+}

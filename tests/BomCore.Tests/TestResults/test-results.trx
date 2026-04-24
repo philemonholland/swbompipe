@@ -1,0 +1,112 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="d22a03b3-b7bf-4531-9f9e-b7599d9beba4" name="gombo@PADOVAN 2026-04-24 11:30:28" runUser="PADOVAN\gombo" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-04-24T11:30:28.9902796-04:00" queuing="2026-04-24T11:30:28.9902798-04:00" start="2026-04-24T11:30:26.5420912-04:00" finish="2026-04-24T11:30:29.0648513-04:00" />
+  <TestSettings name="default" id="037645e5-e8fb-4a63-a559-8ae66dce880c">
+    <Deployment runDeploymentRoot="gombo_PADOVAN_2026-04-24_11_30_28" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="0fb1feca-151d-4bf6-ac80-9938fbc2d18a" testId="0bbda573-b111-a8c5-3d43-1f2487b653ef" testName="BomCore.Tests.BomGeneratorTests.Generate_CreatesAccessoryRowsUsingPipeQuantities" computerName="PADOVAN" duration="00:00:00.0085982" startTime="2026-04-24T11:30:28.9523004-04:00" endTime="2026-04-24T11:30:28.9523004-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0fb1feca-151d-4bf6-ac80-9938fbc2d18a" />
+    <UnitTestResult executionId="097f59b6-f1fa-47dc-b7eb-f4ba546862ea" testId="c2b76bcb-3d28-2390-3290-38cc23a9a8bc" testName="BomCore.Tests.BomGeneratorTests.Generate_SeparatesPipesWithDifferentLengths" computerName="PADOVAN" duration="00:00:00.0030155" startTime="2026-04-24T11:30:28.9524211-04:00" endTime="2026-04-24T11:30:28.9524212-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="097f59b6-f1fa-47dc-b7eb-f4ba546862ea" />
+    <UnitTestResult executionId="8777f794-14f8-44f1-83ff-13ebca6bccd5" testId="b0082dbc-b6b4-f7c1-a116-56858e129703" testName="BomCore.Tests.PropertyDiscoveryServiceTests.SuggestDefaultProfile_UsesKnownPipeMappings" computerName="PADOVAN" duration="00:00:00.0019730" startTime="2026-04-24T11:30:28.9515676-04:00" endTime="2026-04-24T11:30:28.9515677-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8777f794-14f8-44f1-83ff-13ebca6bccd5" />
+    <UnitTestResult executionId="b763529b-9e27-4ded-9b64-96cc183c19cb" testId="dd6e0765-4e47-acb0-7ae2-dcb860003c46" testName="BomCore.Tests.BomProfileTests.Validate_ReportsDuplicateDisplayNames" computerName="PADOVAN" duration="00:00:00.0004551" startTime="2026-04-24T11:30:28.9698684-04:00" endTime="2026-04-24T11:30:28.9698685-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b763529b-9e27-4ded-9b64-96cc183c19cb" />
+    <UnitTestResult executionId="96f452a5-9074-49bd-9b30-0ab83bf0dc66" testId="18e32cf9-9126-5b26-2247-fb3617eabbbb" testName="BomCore.Tests.BomGeneratorTests.Generate_GroupsVirtualPartsWithoutFilePaths" computerName="PADOVAN" duration="00:00:00.0015306" startTime="2026-04-24T11:30:28.9523505-04:00" endTime="2026-04-24T11:30:28.9523506-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="96f452a5-9074-49bd-9b30-0ab83bf0dc66" />
+    <UnitTestResult executionId="764e4e4b-54dc-465d-b5cb-2b4732b95e45" testId="748a783b-39a2-eb4d-9045-fed1c5c7d2b0" testName="BomCore.Tests.BomGeneratorTests.Generate_DoesNotExposeIgnoredPropertiesAsColumns" computerName="PADOVAN" duration="00:00:00.5126415" startTime="2026-04-24T11:30:28.9522558-04:00" endTime="2026-04-24T11:30:28.9522559-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="764e4e4b-54dc-465d-b5cb-2b4732b95e45" />
+    <UnitTestResult executionId="2ee52f39-544c-45fc-959c-53f4ca2865be" testId="66437ebb-55b0-10d0-24c8-ab9871862741" testName="BomCore.Tests.ProfileStoreTests.LoadEffectiveProfile_FallsBackToDefaultWhenCandidateIsInvalid" computerName="PADOVAN" duration="00:00:00.5509230" startTime="2026-04-24T11:30:28.9735815-04:00" endTime="2026-04-24T11:30:28.9735817-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2ee52f39-544c-45fc-959c-53f4ca2865be" />
+    <UnitTestResult executionId="2d06703d-997a-4a9a-bbb7-2e167fb5d6b7" testId="00994de5-3bed-0153-8ee4-bdd18c5181fd" testName="BomCore.Tests.CsvBomExporterTests.Export_WritesSectionsHeadersAndQuantities" computerName="PADOVAN" duration="00:00:00.5102674" startTime="2026-04-24T11:30:28.9522038-04:00" endTime="2026-04-24T11:30:28.9522040-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2d06703d-997a-4a9a-bbb7-2e167fb5d6b7" />
+    <UnitTestResult executionId="c578126c-6d4f-4ea8-b59c-458857b36582" testId="ecb80934-64c7-f0ae-aecc-78b8f7e2e2c8" testName="BomCore.Tests.PropertyDiscoveryServiceTests.DiscoverFromComponents_MarksIgnoredPropertiesInsteadOfRemovingThem" computerName="PADOVAN" duration="00:00:00.5004784" startTime="2026-04-24T11:30:28.9272058-04:00" endTime="2026-04-24T11:30:28.9272300-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c578126c-6d4f-4ea8-b59c-458857b36582" />
+    <UnitTestResult executionId="6febae8c-ba58-47b6-8b68-a989947d5fb3" testId="0702a217-ecde-ba7c-a6c7-b44eb0494d62" testName="BomCore.Tests.BomProfileTests.Validate_ReportsMissingRequiredPipeFields" computerName="PADOVAN" duration="00:00:00.0007383" startTime="2026-04-24T11:30:28.9698018-04:00" endTime="2026-04-24T11:30:28.9698020-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="6febae8c-ba58-47b6-8b68-a989947d5fb3" />
+    <UnitTestResult executionId="2e28aedb-6f2b-4f0d-808f-9de7a43c7052" testId="fa01e942-f838-be08-dda4-2cd01b116b8d" testName="BomCore.Tests.ProfileStoreTests.LoadEffectiveProfile_PrefersProjectLocalProfile" computerName="PADOVAN" duration="00:00:00.0176383" startTime="2026-04-24T11:30:28.9913915-04:00" endTime="2026-04-24T11:30:28.9913920-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2e28aedb-6f2b-4f0d-808f-9de7a43c7052" />
+    <UnitTestResult executionId="5668d610-076b-4ff2-bd00-629b02f79b8c" testId="a8253729-01c9-0eb4-b89a-52ae04a4dd56" testName="BomCore.Tests.BomGeneratorTests.Generate_GroupsIdenticalPipesIntoOneRow" computerName="PADOVAN" duration="00:00:00.0004878" startTime="2026-04-24T11:30:28.9523864-04:00" endTime="2026-04-24T11:30:28.9523865-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5668d610-076b-4ff2-bd00-629b02f79b8c" />
+    <UnitTestResult executionId="e31e00b6-dd90-466a-9a34-63cb71557770" testId="379aaffa-9751-96bc-809d-4f1c0ea95f1c" testName="BomCore.Tests.BomGeneratorTests.Generate_ReportsMissingPipeLengthForPipeCandidate" computerName="PADOVAN" duration="00:00:00.0010658" startTime="2026-04-24T11:30:28.9524636-04:00" endTime="2026-04-24T11:30:28.9524636-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e31e00b6-dd90-466a-9a34-63cb71557770" />
+    <UnitTestResult executionId="e2d9d03c-a7bb-453b-b0d2-963a70418d6c" testId="8ccd2c29-557f-9abb-2026-5ddec5c3bdaa" testName="BomCore.Tests.BomProfileTests.Deserialize_LoadsValidProfile" computerName="PADOVAN" duration="00:00:00.5341075" startTime="2026-04-24T11:30:28.9567472-04:00" endTime="2026-04-24T11:30:28.9567475-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e2d9d03c-a7bb-453b-b0d2-963a70418d6c" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="BomCore.Tests.BomGeneratorTests.Generate_GroupsVirtualPartsWithoutFilePaths" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="18e32cf9-9126-5b26-2247-fb3617eabbbb">
+      <Execution id="96f452a5-9074-49bd-9b30-0ab83bf0dc66" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.BomGeneratorTests" name="Generate_GroupsVirtualPartsWithoutFilePaths" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.BomProfileTests.Deserialize_LoadsValidProfile" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="8ccd2c29-557f-9abb-2026-5ddec5c3bdaa">
+      <Execution id="e2d9d03c-a7bb-453b-b0d2-963a70418d6c" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.BomProfileTests" name="Deserialize_LoadsValidProfile" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.ProfileStoreTests.LoadEffectiveProfile_FallsBackToDefaultWhenCandidateIsInvalid" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="66437ebb-55b0-10d0-24c8-ab9871862741">
+      <Execution id="2ee52f39-544c-45fc-959c-53f4ca2865be" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.ProfileStoreTests" name="LoadEffectiveProfile_FallsBackToDefaultWhenCandidateIsInvalid" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.BomGeneratorTests.Generate_SeparatesPipesWithDifferentLengths" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="c2b76bcb-3d28-2390-3290-38cc23a9a8bc">
+      <Execution id="097f59b6-f1fa-47dc-b7eb-f4ba546862ea" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.BomGeneratorTests" name="Generate_SeparatesPipesWithDifferentLengths" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.PropertyDiscoveryServiceTests.SuggestDefaultProfile_UsesKnownPipeMappings" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="b0082dbc-b6b4-f7c1-a116-56858e129703">
+      <Execution id="8777f794-14f8-44f1-83ff-13ebca6bccd5" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.PropertyDiscoveryServiceTests" name="SuggestDefaultProfile_UsesKnownPipeMappings" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.BomGeneratorTests.Generate_CreatesAccessoryRowsUsingPipeQuantities" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="0bbda573-b111-a8c5-3d43-1f2487b653ef">
+      <Execution id="0fb1feca-151d-4bf6-ac80-9938fbc2d18a" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.BomGeneratorTests" name="Generate_CreatesAccessoryRowsUsingPipeQuantities" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.BomProfileTests.Validate_ReportsDuplicateDisplayNames" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="dd6e0765-4e47-acb0-7ae2-dcb860003c46">
+      <Execution id="b763529b-9e27-4ded-9b64-96cc183c19cb" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.BomProfileTests" name="Validate_ReportsDuplicateDisplayNames" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.PropertyDiscoveryServiceTests.DiscoverFromComponents_MarksIgnoredPropertiesInsteadOfRemovingThem" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="ecb80934-64c7-f0ae-aecc-78b8f7e2e2c8">
+      <Execution id="c578126c-6d4f-4ea8-b59c-458857b36582" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.PropertyDiscoveryServiceTests" name="DiscoverFromComponents_MarksIgnoredPropertiesInsteadOfRemovingThem" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.CsvBomExporterTests.Export_WritesSectionsHeadersAndQuantities" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="00994de5-3bed-0153-8ee4-bdd18c5181fd">
+      <Execution id="2d06703d-997a-4a9a-bbb7-2e167fb5d6b7" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.CsvBomExporterTests" name="Export_WritesSectionsHeadersAndQuantities" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.BomProfileTests.Validate_ReportsMissingRequiredPipeFields" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="0702a217-ecde-ba7c-a6c7-b44eb0494d62">
+      <Execution id="6febae8c-ba58-47b6-8b68-a989947d5fb3" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.BomProfileTests" name="Validate_ReportsMissingRequiredPipeFields" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.ProfileStoreTests.LoadEffectiveProfile_PrefersProjectLocalProfile" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="fa01e942-f838-be08-dda4-2cd01b116b8d">
+      <Execution id="2e28aedb-6f2b-4f0d-808f-9de7a43c7052" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.ProfileStoreTests" name="LoadEffectiveProfile_PrefersProjectLocalProfile" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.BomGeneratorTests.Generate_DoesNotExposeIgnoredPropertiesAsColumns" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="748a783b-39a2-eb4d-9045-fed1c5c7d2b0">
+      <Execution id="764e4e4b-54dc-465d-b5cb-2b4732b95e45" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.BomGeneratorTests" name="Generate_DoesNotExposeIgnoredPropertiesAsColumns" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.BomGeneratorTests.Generate_GroupsIdenticalPipesIntoOneRow" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="a8253729-01c9-0eb4-b89a-52ae04a4dd56">
+      <Execution id="5668d610-076b-4ff2-bd00-629b02f79b8c" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.BomGeneratorTests" name="Generate_GroupsIdenticalPipesIntoOneRow" />
+    </UnitTest>
+    <UnitTest name="BomCore.Tests.BomGeneratorTests.Generate_ReportsMissingPipeLengthForPipeCandidate" storage="c:\codebase\bompipe\tests\bomcore.tests\bin\debug\net8.0\bomcore.tests.dll" id="379aaffa-9751-96bc-809d-4f1c0ea95f1c">
+      <Execution id="e31e00b6-dd90-466a-9a34-63cb71557770" />
+      <TestMethod codeBase="C:\codebase\bompipe\tests\BomCore.Tests\bin\Debug\net8.0\BomCore.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BomCore.Tests.BomGeneratorTests" name="Generate_ReportsMissingPipeLengthForPipeCandidate" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="0bbda573-b111-a8c5-3d43-1f2487b653ef" executionId="0fb1feca-151d-4bf6-ac80-9938fbc2d18a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c2b76bcb-3d28-2390-3290-38cc23a9a8bc" executionId="097f59b6-f1fa-47dc-b7eb-f4ba546862ea" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b0082dbc-b6b4-f7c1-a116-56858e129703" executionId="8777f794-14f8-44f1-83ff-13ebca6bccd5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="dd6e0765-4e47-acb0-7ae2-dcb860003c46" executionId="b763529b-9e27-4ded-9b64-96cc183c19cb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="18e32cf9-9126-5b26-2247-fb3617eabbbb" executionId="96f452a5-9074-49bd-9b30-0ab83bf0dc66" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="748a783b-39a2-eb4d-9045-fed1c5c7d2b0" executionId="764e4e4b-54dc-465d-b5cb-2b4732b95e45" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="66437ebb-55b0-10d0-24c8-ab9871862741" executionId="2ee52f39-544c-45fc-959c-53f4ca2865be" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="00994de5-3bed-0153-8ee4-bdd18c5181fd" executionId="2d06703d-997a-4a9a-bbb7-2e167fb5d6b7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ecb80934-64c7-f0ae-aecc-78b8f7e2e2c8" executionId="c578126c-6d4f-4ea8-b59c-458857b36582" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0702a217-ecde-ba7c-a6c7-b44eb0494d62" executionId="6febae8c-ba58-47b6-8b68-a989947d5fb3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fa01e942-f838-be08-dda4-2cd01b116b8d" executionId="2e28aedb-6f2b-4f0d-808f-9de7a43c7052" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a8253729-01c9-0eb4-b89a-52ae04a4dd56" executionId="5668d610-076b-4ff2-bd00-629b02f79b8c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="379aaffa-9751-96bc-809d-4f1c0ea95f1c" executionId="e31e00b6-dd90-466a-9a34-63cb71557770" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8ccd2c29-557f-9abb-2026-5ddec5c3bdaa" executionId="e2d9d03c-a7bb-453b-b0d2-963a70418d6c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="14" executed="14" passed="14" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.3.1+6b60a9e56a (64-bit .NET 8.0.26)&#xD;
+[xUnit.net 00:00:00.82]   Discovering: BomCore.Tests&#xD;
+[xUnit.net 00:00:00.87]   Discovered:  BomCore.Tests&#xD;
+[xUnit.net 00:00:00.87]   Starting:    BomCore.Tests&#xD;
+[xUnit.net 00:00:01.50]   Finished:    BomCore.Tests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

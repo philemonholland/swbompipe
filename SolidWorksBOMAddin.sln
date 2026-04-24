@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{F4024712-8D92-4D6A-AA2F-80B1BA465608}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BomCore", "src\BomCore\BomCore.csproj", "{3ACD1D36-448D-4C9C-BE51-45F6253C0285}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolidWorksBOMAddin", "src\SolidWorksBOMAddin\SolidWorksBOMAddin.csproj", "{EC2AA5BB-1F09-4D89-BC4E-A35C5817A36E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{52FFE34E-D58A-490F-AD52-83A1FDAB3A07}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BomCore.Tests", "tests\BomCore.Tests\BomCore.Tests.csproj", "{DA2E602C-FB1D-4502-8EC7-08A08043C77C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BomPipeLauncher", "src\BomPipeLauncher\BomPipeLauncher.csproj", "{5DA50816-09F1-432C-A550-2D7F49C8A9B2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3ACD1D36-448D-4C9C-BE51-45F6253C0285}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3ACD1D36-448D-4C9C-BE51-45F6253C0285}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3ACD1D36-448D-4C9C-BE51-45F6253C0285}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3ACD1D36-448D-4C9C-BE51-45F6253C0285}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EC2AA5BB-1F09-4D89-BC4E-A35C5817A36E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EC2AA5BB-1F09-4D89-BC4E-A35C5817A36E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EC2AA5BB-1F09-4D89-BC4E-A35C5817A36E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EC2AA5BB-1F09-4D89-BC4E-A35C5817A36E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA2E602C-FB1D-4502-8EC7-08A08043C77C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA2E602C-FB1D-4502-8EC7-08A08043C77C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA2E602C-FB1D-4502-8EC7-08A08043C77C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA2E602C-FB1D-4502-8EC7-08A08043C77C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5DA50816-09F1-432C-A550-2D7F49C8A9B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5DA50816-09F1-432C-A550-2D7F49C8A9B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5DA50816-09F1-432C-A550-2D7F49C8A9B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5DA50816-09F1-432C-A550-2D7F49C8A9B2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3ACD1D36-448D-4C9C-BE51-45F6253C0285} = {F4024712-8D92-4D6A-AA2F-80B1BA465608}
+		{EC2AA5BB-1F09-4D89-BC4E-A35C5817A36E} = {F4024712-8D92-4D6A-AA2F-80B1BA465608}
+		{DA2E602C-FB1D-4502-8EC7-08A08043C77C} = {52FFE34E-D58A-490F-AD52-83A1FDAB3A07}
+		{5DA50816-09F1-432C-A550-2D7F49C8A9B2} = {F4024712-8D92-4D6A-AA2F-80B1BA465608}
+	EndGlobalSection
+EndGlobal
