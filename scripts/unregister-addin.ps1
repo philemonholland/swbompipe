@@ -1,28 +1,17 @@
 param(
     [ValidateSet('Debug', 'Release')]
-    [string]$Configuration = 'Debug'
+    [string]$Configuration = 'Debug',
+    [string]$ComHostPath
 )
 
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
-$framework = 'net8.0-windows'
-$guid = '{E1DB31B7-4F08-4B0D-99E4-69AFC34C5B1A}'
-$comHostPath = Join-Path $repoRoot "src\SolidWorksBOMAddin\bin\$Configuration\$framework\AFCA.PipingBom.Generator.comhost.dll"
+. (Join-Path $PSScriptRoot 'BomPipe.Install.Common.ps1')
 
-if (Test-Path $comHostPath) {
-    & regsvr32.exe /u /s $comHostPath
+if ([string]::IsNullOrWhiteSpace($ComHostPath)) {
+    $ComHostPath = Get-BomPipeDefaultComHostPath -Configuration $Configuration
 }
 
-[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree("Software\SolidWorks\AddIns\$guid", $false)
-
-$startupKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Software\SolidWorks\AddInsStartup", $true)
-if ($startupKey -and $startupKey.GetValue($guid) -ne $null) {
-    $startupKey.DeleteValue($guid, $false)
-}
-
-if ($startupKey) {
-    $startupKey.Dispose()
-}
+Unregister-BomPipeAddin -ComHostPath $ComHostPath
 
 Write-Host "Unregistered AFCA Piping BOM Generator"

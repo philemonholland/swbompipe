@@ -14,13 +14,13 @@ AFCA Piping BOM Generator is a C# SolidWorks BOM tool for piping assemblies. The
 
 ## Current commands
 
-Use the pinned SDK in `global.json` with the local dotnet executable:
+Use the pinned SDK in `global.json` with a .NET 8 SDK on your machine:
 
 ```powershell
-C:\Users\gombo\.dotnet\dotnet.exe restore .\SolidWorksBOMAddin.sln
-C:\Users\gombo\.dotnet\dotnet.exe build .\SolidWorksBOMAddin.sln
-C:\Users\gombo\.dotnet\dotnet.exe test .\SolidWorksBOMAddin.sln
-C:\Users\gombo\.dotnet\dotnet.exe test .\tests\BomCore.Tests\BomCore.Tests.csproj --filter FullyQualifiedName~BomGeneratorTests
+dotnet restore .\SolidWorksBOMAddin.sln
+dotnet build .\SolidWorksBOMAddin.sln
+dotnet test .\SolidWorksBOMAddin.sln
+dotnet test .\tests\BomCore.Tests\BomCore.Tests.csproj --filter FullyQualifiedName~BomGeneratorTests
 ```
 
 Register or unregister the add-in host after building:
@@ -34,6 +34,13 @@ To register the add-in at SolidWorks startup for the current user:
 
 ```powershell
 .\scripts\register-addin.ps1 -StartAtSolidWorksStartup
+```
+
+One-click install and uninstall from the repository root:
+
+```cmd
+install-bompipe.cmd
+uninstall-bompipe.cmd
 ```
 
 ## Intended workflow
@@ -50,8 +57,8 @@ The preview shell exposes buttons for selected-part property reads, active-assem
 The external launcher can be invoked directly against an assembly path:
 
 ```powershell
-C:\Users\gombo\.dotnet\dotnet.exe run --project .\src\BomPipeLauncher\BomPipeLauncher.csproj -- --assembly "D:\AFCA\projects\test_project_2\Test_Project.SLDASM" --format csv
-C:\Users\gombo\.dotnet\dotnet.exe run --project .\src\BomPipeLauncher\BomPipeLauncher.csproj -- --assembly "D:\AFCA\projects\test_project_2\Test_Project.SLDASM" --format csv --debug-report "D:\Exports\Test_Project.debug.json"
+dotnet run --project .\src\BomPipeLauncher\BomPipeLauncher.csproj -- --assembly "C:\Path\To\Assembly.SLDASM" --format csv
+dotnet run --project .\src\BomPipeLauncher\BomPipeLauncher.csproj -- --assembly "C:\Path\To\Assembly.SLDASM" --format csv --debug-report "C:\Path\To\Exports\Assembly.debug.json"
 ```
 
 Pipe detection, grouping, ignored properties, and accessory generation are described in `docs\property-rules.md`.
@@ -62,15 +69,28 @@ Pipe detection, grouping, ignored properties, and accessory generation are descr
 - Current SolidWorks interop packages are `32.1.0`, which correspond to the SolidWorks 2024 API generation
 - The provided registration scripts write the add-in registration under `HKCU\Software\SolidWorks`, so the current-user registration flow does **not normally require admin rights**
 - Installing SolidWorks itself, machine-wide prerequisites, or changing machine-wide registration policy may still require elevation on a workstation
+- `install-bompipe.cmd` stages a per-user install under `%LocalAppData%\AFCA\BOMPipe`, copies the launcher/add-in payload, and installs `Generate BOM with BOMPipe` for `.SLDASM`
+- The installed right-click command runs `Invoke-BOMPipe.ps1`, which exports an `.xlsx` BOM plus a `.debug.json` report to `%UserProfile%\Documents\AFCA\BOMPipe\Exports`
+- SolidWorks PDM Professional uses the same Explorer-hosted shell verb path for `.SLDASM` files, so the installed command appears in both Explorer and the PDM Professional vault view
+- If you also want the in-session SolidWorks add-in registered, run `.\scripts\register-addin.ps1` separately after building
 - Effective profile lookup order is:
   1. profile beside the assembly
   2. `%AppData%\AFCA\SolidWorksBOMAddin\profiles\`
   3. `%ProgramData%\AFCA\SolidWorksBOMAddin\profiles\`
   4. built-in `profiles\default.pipebom.json`
 
+Installer examples:
+
+```powershell
+.\scripts\install-bompipe.ps1
+.\scripts\install-bompipe.ps1 -ForceRebuild
+.\scripts\uninstall-bompipe.ps1
+.\scripts\register-addin.ps1 -StartAtSolidWorksStartup
+```
+
 ## Validation note
 
-`BomCore` can be validated with normal .NET tests, but SolidWorks-specific end-to-end validation depends on a local SolidWorks installation. The planned real-assembly validation target is `D:\AFCA\projects\test_project_2\Test_Project.SLDASM`.
+`BomCore` can be validated with normal .NET tests, but SolidWorks-specific end-to-end validation depends on a local SolidWorks installation and a local `.SLDASM` fixture that exists on the target machine.
 
 The current launcher path has already been exercised against that fixture and produced:
 

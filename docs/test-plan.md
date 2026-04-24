@@ -40,9 +40,9 @@ Future integration validation should happen on a workstation with SolidWorks ins
 
 ## Real assembly validation target
 
-The designated local validation assembly is:
+Use a local SolidWorks assembly fixture that exists on the workstation running the validation, for example:
 
-`D:\AFCA\projects\test_project_2\Test_Project.SLDASM`
+`C:\Path\To\Test_Project.SLDASM`
 
 Planned checks against that assembly:
 
