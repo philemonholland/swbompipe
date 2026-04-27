@@ -1,14 +1,16 @@
 # AFCA Piping BOM Generator
 
-AFCA Piping BOM Generator is a C# SolidWorks BOM tool for piping assemblies. The solution separates **BomCore** (pure BOM logic) from **SolidWorksBOMAddin** (SolidWorks adapter/UI) and **BomPipeLauncher** (background SolidWorks automation for Explorer/PDM-style launch flows) so grouping, profile handling, diagnostics, and exports can be tested without a live SolidWorks session.
+AFCA Piping BOM Generator is a C# SolidWorks BOM tool for piping assemblies. The solution separates **BomCore** (pure BOM logic), **SolidWorksBOMAddin** (SolidWorks adapter/UI), **BomPipeLauncher** (background export launcher), and the new **BomPipePdmAddin** / **BomPipePdmVaultInstaller** pieces for SolidWorks PDM Professional integration so grouping, profile handling, diagnostics, and exports can be tested without a live SolidWorks session.
 
 ## Repository layout
 
 - `src\BomCore` - SolidWorks-free BOM domain logic
 - `src\SolidWorksBOMAddin` - COM add-in, adapters, and UI shell
 - `src\BomPipeLauncher` - external launcher for background assembly processing
+- `src\BomPipePdmAddin` - SolidWorks PDM Professional add-in that contributes the right-click menu command
+- `src\BomPipePdmVaultInstaller` - vault registration utility for installing or removing the PDM add-in
 - `tests\BomCore.Tests` - unit tests for core logic
-- `scripts\register-addin.ps1` / `scripts\unregister-addin.ps1` - COM host registration helpers
+- `scripts\register-addin.ps1` / `scripts\unregister-addin.ps1` - SolidWorks add-in registration helpers
 - `profiles\default.pipebom.json` - default AFCA pipe BOM profile
 - `docs\` - architecture, rules, and test planning
 
@@ -45,7 +47,7 @@ uninstall-bompipe.cmd
 
 ## Intended workflow
 
-1. Open a SolidWorks assembly, or launch the tool from SolidWorks, Windows Explorer, or PDM.
+1. Open a SolidWorks assembly, or launch the tool from SolidWorks, Windows Explorer, or the PDM Professional vault context menu.
 2. In SolidWorks, use the **Pipe BOM > Open BOM Preview Shell** command to open the minimal WinForms preview/mapping shell.
 3. Read selected-part properties or scan the full assembly through the SolidWorks adapter layer.
 4. Load the effective JSON profile in this order: project-local, `%AppData%`, `%ProgramData%`, then built-in default.
@@ -65,14 +67,13 @@ Pipe detection, grouping, ignored properties, and accessory generation are descr
 
 ## Installation and registration notes
 
-- Current project targets: `.NET 8`, `net8.0`, and `net8.0-windows`
+- Current project targets: `.NET 8`, `net8.0`, `net8.0-windows`, and `net48` for the PDM Professional add-in components
 - Current SolidWorks interop packages are `32.1.0`, which correspond to the SolidWorks 2024 API generation
-- The provided registration scripts write the add-in registration under `HKCU\Software\SolidWorks`, so the current-user registration flow does **not normally require admin rights**
-- Installing SolidWorks itself, machine-wide prerequisites, or changing machine-wide registration policy may still require elevation on a workstation
-- `install-bompipe.cmd` stages a per-user install under `%LocalAppData%\AFCA\BOMPipe`, copies the launcher/add-in payload, and installs `Generate BOM with BOMPipe` for `.SLDASM`
+- The SolidWorks add-in registration uses per-user COM registration under `HKCU\Software\Classes` plus a per-user background loader that calls `LoadAddIn("AFCA.PipingBom.Generator")` for running SolidWorks sessions, so the install can stay no-admin
+- `install-bompipe.cmd` stages a per-user install under `%LocalAppData%\AFCA\BOMPipe`, registers the SolidWorks add-in, starts the per-user SolidWorks loader, installs `Generate BOM with BOMPipe` for `.SLDASM` in Explorer, and registers the PDM Professional add-in in the selected vaults
 - The installed right-click command runs `Invoke-BOMPipe.ps1`, which exports an `.xlsx` BOM plus a `.debug.json` report to `%UserProfile%\Documents\AFCA\BOMPipe\Exports`
-- SolidWorks PDM Professional uses the same Explorer-hosted shell verb path for `.SLDASM` files, so the installed command appears in both Explorer and the PDM Professional vault view
-- If you also want the in-session SolidWorks add-in registered, run `.\scripts\register-addin.ps1` separately after building
+- PDM Professional integration is now a real `IEdmAddIn5` vault add-in, not just an Explorer shell verb; vault registration requires a PDM admin-capable login for the target vault view
+- Use `-PdmVaultName <vault>` to target a specific local vault view during install or uninstall; if omitted, the vault installer targets all locally registered vault views
 - Effective profile lookup order is:
   1. profile beside the assembly
   2. `%AppData%\AFCA\SolidWorksBOMAddin\profiles\`
@@ -83,14 +84,17 @@ Installer examples:
 
 ```powershell
 .\scripts\install-bompipe.ps1
+.\scripts\install-bompipe.ps1 -PdmVaultName AFCA
 .\scripts\install-bompipe.ps1 -ForceRebuild
+.\scripts\install-bompipe.ps1 -SkipPdmRegistration
 .\scripts\uninstall-bompipe.ps1
+.\scripts\uninstall-bompipe.ps1 -PdmVaultName AFCA
 .\scripts\register-addin.ps1 -StartAtSolidWorksStartup
 ```
 
 ## Validation note
 
-`BomCore` can be validated with normal .NET tests, but SolidWorks-specific end-to-end validation depends on a local SolidWorks installation and a local `.SLDASM` fixture that exists on the target machine.
+`BomCore` can be validated with normal .NET tests, but SolidWorks-specific end-to-end validation depends on a local SolidWorks installation, a local `.SLDASM` fixture that exists on the target machine, and a local PDM vault view when validating the PDM Professional menu.
 
 The current launcher path has already been exercised against that fixture and produced:
 

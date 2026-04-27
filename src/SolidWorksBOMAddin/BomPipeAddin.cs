@@ -9,6 +9,7 @@ namespace SolidWorksBOMAddin;
 [ComVisible(true)]
 [Guid("E1DB31B7-4F08-4B0D-99E4-69AFC34C5B1A")]
 [ProgId("AFCA.PipingBom.Generator")]
+[ClassInterface(ClassInterfaceType.AutoDual)]
 public sealed class BomPipeAddin : ISwAddin
 {
     private const int PreviewCommandGroupId = 0x5A01;
@@ -28,11 +29,22 @@ public sealed class BomPipeAddin : ISwAddin
 
     public bool ConnectToSW(object thisSw, int cookie)
     {
-        _application = thisSw as ISldWorks
-            ?? throw new InvalidCastException("SolidWorks did not provide an ISldWorks application object.");
-        _cookie = cookie;
-        RegisterCommandGroup();
-        return true;
+        try
+        {
+            BomPipeLog.Info("ConnectToSW entered.");
+            _application = thisSw as ISldWorks
+                ?? throw new InvalidCastException("SolidWorks did not provide an ISldWorks application object.");
+            _cookie = cookie;
+            RegisterCommandGroup();
+            BomPipeLog.Info("ConnectToSW completed.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            BomPipeLog.Error("ConnectToSW failed.", ex);
+            ShowSolidWorksError("BOMPipe failed to load.", ex);
+            return false;
+        }
     }
 
     public bool DisconnectFromSW()
@@ -66,33 +78,58 @@ public sealed class BomPipeAddin : ISwAddin
 
     public void OpenPreviewShell()
     {
-        if (_previewShell is null || _previewShell.IsDisposed)
+        try
         {
-            System.Windows.Forms.Application.EnableVisualStyles();
-            _previewShell = new BomPreviewShellForm(this);
-            _previewShell.FormClosed += (_, _) =>
+            BomPipeLog.Info("OpenPreviewShell entered.");
+            if (_previewShell is null || _previewShell.IsDisposed)
             {
-                if (_previewShell?.IsDisposed == true)
+                System.Windows.Forms.Application.EnableVisualStyles();
+                _previewShell = new BomPreviewShellForm(this);
+                _previewShell.TopMost = true;
+                _previewShell.FormClosed += (_, _) =>
                 {
-                    _previewShell = null;
+                    if (_previewShell?.IsDisposed == true)
+                    {
+                        _previewShell = null;
+                    }
+                };
+
+                var ownerWindow = GetSolidWorksOwnerWindow();
+                if (ownerWindow is null)
+                {
+                    _previewShell.Show();
                 }
-            };
-            _previewShell.Show();
-        }
-        else
-        {
-            if (_previewShell.WindowState == System.Windows.Forms.FormWindowState.Minimized)
+                else
+                {
+                    _previewShell.Show(ownerWindow);
+                }
+            }
+            else
             {
-                _previewShell.WindowState = System.Windows.Forms.FormWindowState.Normal;
+                if (_previewShell.WindowState == System.Windows.Forms.FormWindowState.Minimized)
+                {
+                    _previewShell.WindowState = System.Windows.Forms.FormWindowState.Normal;
+                }
+
+                _previewShell.TopMost = true;
+                _previewShell.Show();
+                _previewShell.Activate();
+                _previewShell.BringToFront();
+                _previewShell.Focus();
             }
 
-            _previewShell.BringToFront();
-            _previewShell.Focus();
+            BomPipeLog.Info("OpenPreviewShell completed.");
+        }
+        catch (Exception ex)
+        {
+            BomPipeLog.Error("OpenPreviewShell failed.", ex);
+            ShowSolidWorksError("BOMPipe could not open the preview shell.", ex);
         }
     }
 
     public int CanOpenPreviewShell()
     {
+        BomPipeLog.Info("CanOpenPreviewShell queried.");
         return 1;
     }
 
@@ -104,6 +141,7 @@ public sealed class BomPipeAddin : ISwAddin
     private void RegisterCommandGroup()
     {
         var application = RequireApplication();
+        BomPipeLog.Info("Registering SolidWorks command group.");
         application.SetAddinCallbackInfo2(0L, this, _cookie);
         _commandManager = application.GetCommandManager(_cookie);
 
@@ -135,5 +173,47 @@ public sealed class BomPipeAddin : ISwAddin
             0,
             (int)swCommandItemType_e.swMenuItem);
         _commandGroup.Activate();
+        BomPipeLog.Info("SolidWorks command group registered.");
+    }
+
+    private System.Windows.Forms.IWin32Window? GetSolidWorksOwnerWindow()
+    {
+        try
+        {
+            dynamic application = RequireApplication();
+            dynamic frame = application.Frame();
+            var handle = Convert.ToInt32(frame.GetHWnd());
+            return handle == 0 ? null : new NativeWindowWrapper(new IntPtr(handle));
+        }
+        catch (Exception ex)
+        {
+            BomPipeLog.Error("Could not resolve SolidWorks owner window.", ex);
+            return null;
+        }
+    }
+
+    private void ShowSolidWorksError(string message, Exception exception)
+    {
+        try
+        {
+            _application?.SendMsgToUser2(
+                $"{message}{System.Environment.NewLine}{exception.Message}",
+                (int)swMessageBoxIcon_e.swMbStop,
+                (int)swMessageBoxBtn_e.swMbOk);
+        }
+        catch
+        {
+            // SolidWorks may be shutting down or unavailable.
+        }
+    }
+
+    private sealed class NativeWindowWrapper : System.Windows.Forms.IWin32Window
+    {
+        public NativeWindowWrapper(IntPtr handle)
+        {
+            Handle = handle;
+        }
+
+        public IntPtr Handle { get; }
     }
 }

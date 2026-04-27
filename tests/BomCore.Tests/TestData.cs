@@ -9,7 +9,7 @@ internal static class TestData
         return new BomProfile
         {
             ProfileName = "AFCA Pipe BOM",
-            Version = 1,
+            Version = 2,
             PartClassRules =
             [
                 new PartClassRule
@@ -54,6 +54,23 @@ internal static class TestData
                     Unit = "in",
                 },
             ],
+            SectionColumnProfiles = KnownBomSections.ConfigurableSections
+                .Select(section => new BomSectionColumnProfile
+                {
+                    Section = section,
+                    Columns = section == KnownBomSections.Pipes
+                        ? KnownBomColumnProfiles.CreateDefaultSectionColumns(KnownBomSections.Pipes)
+                        : KnownBomColumnProfiles.CreateDefaultSectionColumns(section),
+                })
+                .ToList(),
+            SectionRules = KnownBomSections.ClassMappedSections
+                .Select(section => new BomSectionRule
+                {
+                    SourceProperty = KnownPropertyNames.PrimaryFamily,
+                    MatchValue = section,
+                    Section = section,
+                })
+                .ToList(),
             AccessoryRules =
             [
                 new AccessoryRule
@@ -86,6 +103,8 @@ internal static class TestData
         var properties = new Dictionary<string, PropertyValue>(StringComparer.OrdinalIgnoreCase)
         {
             [KnownPropertyNames.Bom] = CreateProperty(KnownPropertyNames.Bom, bom),
+            [KnownPropertyNames.PrimaryFamily] = CreateProperty(KnownPropertyNames.PrimaryFamily, KnownBomSections.Pipes),
+            [KnownPropertyNames.ComponentType] = CreateProperty(KnownPropertyNames.ComponentType, "Pipe"),
             [KnownPropertyNames.PipeIdentifier] = CreateProperty(KnownPropertyNames.PipeIdentifier, pipeIdentifier),
             [KnownPropertyNames.Specification] = CreateProperty(KnownPropertyNames.Specification, specification),
             [KnownPropertyNames.PipeLength] = CreateProperty(KnownPropertyNames.PipeLength, pipeLength),
@@ -124,7 +143,49 @@ internal static class TestData
             ComponentName = componentName,
             Quantity = quantity,
             IsVirtual = true,
-            Properties = new Dictionary<string, PropertyValue>(StringComparer.OrdinalIgnoreCase),
+            Properties = new Dictionary<string, PropertyValue>(StringComparer.OrdinalIgnoreCase)
+            {
+                [KnownPropertyNames.PrimaryFamily] = CreateProperty(KnownPropertyNames.PrimaryFamily, KnownBomSections.Fittings),
+                [KnownPropertyNames.ComponentType] = CreateProperty(KnownPropertyNames.ComponentType, "Virtual"),
+                [KnownPropertyNames.BomDesc] = CreateProperty(KnownPropertyNames.BomDesc, componentName),
+                [KnownPropertyNames.Description] = CreateProperty(KnownPropertyNames.Description, componentName),
+            },
+        };
+    }
+
+    public static ComponentRecord CreateClassifiedComponent(
+        string componentId,
+        string section,
+        string bomDesc,
+        string description,
+        decimal quantity = 1m,
+        IReadOnlyDictionary<string, string>? extraProperties = null)
+    {
+        var properties = new Dictionary<string, PropertyValue>(StringComparer.OrdinalIgnoreCase)
+        {
+            [KnownPropertyNames.Class] = CreateProperty(KnownPropertyNames.Class, section),
+            [KnownPropertyNames.PrimaryFamily] = CreateProperty(KnownPropertyNames.PrimaryFamily, section),
+            [KnownPropertyNames.ComponentType] = CreateProperty(KnownPropertyNames.ComponentType, section),
+            [KnownPropertyNames.BomDesc] = CreateProperty(KnownPropertyNames.BomDesc, bomDesc),
+            [KnownPropertyNames.Description] = CreateProperty(KnownPropertyNames.Description, description),
+        };
+
+        if (extraProperties is not null)
+        {
+            foreach (var pair in extraProperties)
+            {
+                properties[pair.Key] = CreateProperty(pair.Key, pair.Value);
+            }
+        }
+
+        return new ComponentRecord
+        {
+            ComponentId = componentId,
+            FilePath = $@"C:\assemblies\{componentId}.sldprt",
+            ConfigurationName = "Default",
+            ComponentName = componentId,
+            Quantity = quantity,
+            Properties = properties,
         };
     }
 

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Globalization;
 using System.Drawing;
+using System.Reflection;
 using System.Windows.Forms;
 using BomCore;
 using SolidWorks.Interop.sldworks;
@@ -10,18 +11,35 @@ namespace SolidWorksBOMAddin;
 
 internal sealed class BomPreviewShellForm : Form
 {
+    private static readonly Color ShellBackColor = Color.FromArgb(238, 241, 235);
+    private static readonly Color ShellSurfaceColor = Color.FromArgb(252, 250, 244);
+    private static readonly Color ShellHeaderColor = Color.FromArgb(31, 57, 53);
+    private static readonly Color ShellAccentColor = Color.FromArgb(193, 122, 61);
+    private static readonly Color ShellAccentDarkColor = Color.FromArgb(139, 82, 45);
+    private static readonly Color ShellGridLineColor = Color.FromArgb(214, 207, 190);
+    private static readonly Color ShellTextColor = Color.FromArgb(30, 34, 32);
+    private static readonly Color ShellMutedTextColor = Color.FromArgb(89, 92, 86);
+
     private readonly BomPipeAddin _addin;
     private readonly ProfileStore _profileStore = new();
     private readonly PropertyDiscoveryService _propertyDiscoveryService = new();
     private readonly BomGenerator _bomGenerator = new();
     private readonly BindingList<PipeColumnMappingRow> _pipeColumns = [];
+    private readonly Dictionary<string, BindingList<SectionColumnMappingRow>> _sectionColumnsBySection = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DataGridView> _sectionColumnGrids = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BindingList<SectionRuleMappingRow> _sectionRules = [];
     private readonly BindingList<AccessoryMappingRow> _accessoryRules = [];
-    private readonly DataGridView _selectedPropertiesGrid;
+    private readonly Dictionary<PropertyScope, DataGridView> _selectedPropertyGrids;
     private readonly DataGridView _pipeColumnsGrid;
+    private readonly TabControl _sectionTabs;
+    private readonly DataGridView _sectionRulesGrid;
     private readonly DataGridView _accessoryRulesGrid;
     private readonly DataGridView _previewGrid;
     private readonly DataGridView _diagnosticsGrid;
+    private readonly DataGridView _mappingPreviewGrid;
+    private readonly DataGridView _mappingDiagnosticsGrid;
     private readonly ListBox _discoveredPropertiesList;
+    private readonly TabControl _selectedPropertiesTabs;
     private readonly Label _summaryLabel;
     private readonly Label _profileLabel;
     private readonly Label _statusLabel;
@@ -33,6 +51,7 @@ internal sealed class BomPreviewShellForm : Form
     private string? _assemblyPath;
     private string? _assemblyDisplayName;
     private string? _profileSourcePath;
+    private string? _externalSettingsPath;
     private int _componentsScanned;
     private int? _componentsSkipped;
 
@@ -40,8 +59,11 @@ internal sealed class BomPreviewShellForm : Form
     {
         _addin = addin ?? throw new ArgumentNullException(nameof(addin));
 
-        Text = "Pipe BOM Preview Shell";
+        Text = "BOMPipe Mapping Workspace";
         StartPosition = FormStartPosition.CenterScreen;
+        TopMost = true;
+        BackColor = ShellBackColor;
+        Font = new Font("Segoe UI", 9F);
         Width = 1280;
         Height = 860;
         MinimumSize = new Size(960, 640);
@@ -51,7 +73,8 @@ internal sealed class BomPreviewShellForm : Form
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 4,
-            Padding = new Padding(8),
+            Padding = new Padding(12),
+            BackColor = ShellBackColor,
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -64,14 +87,20 @@ internal sealed class BomPreviewShellForm : Form
             AutoSize = true,
             WrapContents = true,
             FlowDirection = FlowDirection.LeftToRight,
+            BackColor = ShellBackColor,
         };
 
-        commandPanel.Controls.Add(CreateActionButton("Read Selected Part Properties", (_, _) => ReadSelectedPartProperties()));
-        commandPanel.Controls.Add(CreateActionButton("Scan Active Assembly", (_, _) => ScanActiveAssembly()));
-        commandPanel.Controls.Add(CreateActionButton("Edit BOM Mapping", (_, _) => ShowMappingTab()));
-        commandPanel.Controls.Add(CreateActionButton("Generate BOM Preview", (_, _) => GenerateBomPreview()));
+        commandPanel.Controls.Add(CreateActionButton("Read Selected Part", (_, _) => ReadSelectedPartProperties()));
+        commandPanel.Controls.Add(CreateActionButton("Scan Assembly", (_, _) => ScanActiveAssembly()));
+        commandPanel.Controls.Add(CreateActionButton("Mapping", (_, _) => ShowMappingTab()));
+        commandPanel.Controls.Add(CreateActionButton("Refresh Preview", (_, _) => RefreshMappingPreview()));
+        commandPanel.Controls.Add(CreateActionButton("Generate Preview", (_, _) => GenerateBomPreview()));
         commandPanel.Controls.Add(CreateActionButton("Export CSV", (_, _) => ExportBom("csv")));
         commandPanel.Controls.Add(CreateActionButton("Export Excel", (_, _) => ExportBom("xlsx")));
+        commandPanel.Controls.Add(CreateActionButton("Import Settings", (_, _) => ImportSettings()));
+        commandPanel.Controls.Add(CreateActionButton("Export Settings", (_, _) => ExportSettings()));
+        commandPanel.Controls.Add(CreateActionButton("Set Settings File", (_, _) => SetSettingsFile()));
+        commandPanel.Controls.Add(CreateActionButton("Save Mapping Profile", (_, _) => SaveMapping(), accent: true));
 
         var infoPanel = new TableLayoutPanel
         {
@@ -79,20 +108,25 @@ internal sealed class BomPreviewShellForm : Form
             ColumnCount = 1,
             RowCount = 2,
             AutoSize = true,
-            Padding = new Padding(0, 4, 0, 4),
+            Padding = new Padding(12),
+            Margin = new Padding(0, 0, 0, 10),
+            BackColor = ShellHeaderColor,
         };
 
         _summaryLabel = new Label
         {
             Dock = DockStyle.Fill,
             AutoSize = true,
-            Text = "Scan an active SolidWorks assembly to populate component counts, mapping hints, and preview rows.",
+            ForeColor = Color.White,
+            Font = new Font(Font, FontStyle.Bold),
+            Text = "Start: select a component in SolidWorks, read its properties, scan the assembly, map columns, refresh preview, then save the mapping profile.",
         };
         _profileLabel = new Label
         {
             Dock = DockStyle.Fill,
             AutoSize = true,
-            Text = "Mapping note: NumGaskets and NumClamps create accessory rows in Pipe Accessories rather than standard pipe columns.",
+            ForeColor = Color.FromArgb(224, 230, 219),
+            Text = "Rows are property-driven. Component names, file paths, and configuration names are diagnostics only.",
         };
         infoPanel.Controls.Add(_summaryLabel, 0, 0);
         infoPanel.Controls.Add(_profileLabel, 0, 1);
@@ -102,15 +136,23 @@ internal sealed class BomPreviewShellForm : Form
             Dock = DockStyle.Fill,
         };
 
-        _selectedPropertiesGrid = CreateReadOnlyGrid();
+        _selectedPropertyGrids = CreateSelectedPropertyGrids();
+        _selectedPropertiesTabs = CreateSelectedPropertiesTabs();
         _pipeColumnsGrid = CreatePipeColumnsGrid();
         _accessoryRulesGrid = CreateAccessoryRulesGrid();
+        _sectionTabs = CreateSectionTabs();
+        _sectionRulesGrid = CreateSectionRulesGrid();
         _previewGrid = CreateReadOnlyGrid();
         _diagnosticsGrid = CreateReadOnlyGrid();
+        _mappingPreviewGrid = CreateReadOnlyGrid();
+        _mappingDiagnosticsGrid = CreateReadOnlyGrid();
         _discoveredPropertiesList = new ListBox
         {
             Dock = DockStyle.Fill,
             IntegralHeight = false,
+            BackColor = ShellSurfaceColor,
+            ForeColor = ShellTextColor,
+            BorderStyle = BorderStyle.None,
         };
 
         _tabControl.TabPages.Add(CreateSelectedPropertiesTab());
@@ -123,6 +165,8 @@ internal sealed class BomPreviewShellForm : Form
             Dock = DockStyle.Fill,
             AutoSize = true,
             Padding = new Padding(0, 6, 0, 0),
+            ForeColor = ShellMutedTextColor,
+            BackColor = ShellBackColor,
             Text = "Ready.",
         };
 
@@ -132,10 +176,11 @@ internal sealed class BomPreviewShellForm : Form
         root.Controls.Add(_statusLabel, 0, 3);
         Controls.Add(root);
 
+        _externalSettingsPath = LoadConfiguredSettingsPath();
         LoadDefaultProfileContext();
     }
 
-    private static Button CreateActionButton(string text, EventHandler onClick)
+    private static Button CreateActionButton(string text, EventHandler onClick, bool accent = false)
     {
         var button = new Button
         {
@@ -144,15 +189,20 @@ internal sealed class BomPreviewShellForm : Form
             Margin = new Padding(0, 0, 8, 8),
             Padding = new Padding(10, 6, 10, 6),
             Text = text,
-            UseVisualStyleBackColor = true,
+            UseVisualStyleBackColor = false,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = accent ? ShellAccentColor : ShellSurfaceColor,
+            ForeColor = accent ? Color.White : ShellTextColor,
         };
+        button.FlatAppearance.BorderColor = accent ? ShellAccentDarkColor : ShellGridLineColor;
+        button.FlatAppearance.MouseOverBackColor = accent ? ShellAccentDarkColor : Color.FromArgb(247, 241, 226);
         button.Click += onClick;
         return button;
     }
 
     private static DataGridView CreateReadOnlyGrid()
     {
-        return new DataGridView
+        var grid = new DataGridView
         {
             Dock = DockStyle.Fill,
             AllowUserToAddRows = false,
@@ -163,6 +213,27 @@ internal sealed class BomPreviewShellForm : Form
             RowHeadersVisible = false,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         };
+        StyleGrid(grid);
+        return grid;
+    }
+
+    private static void StyleGrid(DataGridView grid)
+    {
+        grid.BackgroundColor = ShellSurfaceColor;
+        grid.BorderStyle = BorderStyle.None;
+        grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+        grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+        grid.EnableHeadersVisualStyles = false;
+        grid.GridColor = ShellGridLineColor;
+        grid.DefaultCellStyle.BackColor = ShellSurfaceColor;
+        grid.DefaultCellStyle.ForeColor = ShellTextColor;
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(58, 95, 89);
+        grid.DefaultCellStyle.SelectionForeColor = Color.White;
+        grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(247, 244, 235);
+        grid.ColumnHeadersDefaultCellStyle.BackColor = ShellHeaderColor;
+        grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+        grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        grid.RowTemplate.Height = 26;
     }
 
     private DataGridView CreatePipeColumnsGrid()
@@ -178,6 +249,7 @@ internal sealed class BomPreviewShellForm : Form
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             DataSource = _pipeColumns,
         };
+        StyleGrid(grid);
 
         grid.Columns.Add(CreateTextColumn(nameof(PipeColumnMappingRow.SourceProperty), "Source Property"));
         grid.Columns.Add(CreateTextColumn(nameof(PipeColumnMappingRow.DisplayName), "Display Name"));
@@ -185,6 +257,86 @@ internal sealed class BomPreviewShellForm : Form
         grid.Columns.Add(CreateCheckboxColumn(nameof(PipeColumnMappingRow.GroupBy), "Group By"));
         grid.Columns.Add(CreateTextColumn(nameof(PipeColumnMappingRow.Order), "Order", 80));
         grid.Columns.Add(CreateTextColumn(nameof(PipeColumnMappingRow.Unit), "Unit", 90));
+        return grid;
+    }
+
+    private TabControl CreateSectionTabs()
+    {
+        var tabControl = new TabControl
+        {
+            Dock = DockStyle.Fill,
+        };
+
+        foreach (var section in KnownBomSections.ConfigurableSections)
+        {
+            var rows = new BindingList<SectionColumnMappingRow>();
+            _sectionColumnsBySection[section] = rows;
+
+            var grid = CreateSectionColumnsGrid(rows);
+            _sectionColumnGrids[section] = grid;
+
+            var page = new TabPage(section)
+            {
+                Name = $"{section}SectionTab",
+                BackColor = ShellSurfaceColor,
+            };
+            page.Controls.Add(grid);
+            tabControl.TabPages.Add(page);
+        }
+
+        var accessoryPage = new TabPage(KnownBomSections.OtherAccessories)
+        {
+            Name = "OtherAccessoriesSectionTab",
+            BackColor = ShellSurfaceColor,
+        };
+        accessoryPage.Controls.Add(_accessoryRulesGrid);
+        tabControl.TabPages.Add(accessoryPage);
+
+        return tabControl;
+    }
+
+    private DataGridView CreateSectionColumnsGrid(BindingList<SectionColumnMappingRow> rows)
+    {
+        var grid = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            AutoGenerateColumns = false,
+            AllowUserToAddRows = true,
+            AllowUserToDeleteRows = true,
+            RowHeadersVisible = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            DataSource = rows,
+        };
+        StyleGrid(grid);
+
+        grid.Columns.Add(CreateTextColumn(nameof(SectionColumnMappingRow.SourceProperty), "Source Property"));
+        grid.Columns.Add(CreateTextColumn(nameof(SectionColumnMappingRow.DisplayName), "Output Header"));
+        grid.Columns.Add(CreateCheckboxColumn(nameof(SectionColumnMappingRow.Enabled), "Enabled"));
+        grid.Columns.Add(CreateCheckboxColumn(nameof(SectionColumnMappingRow.GroupBy), "Group"));
+        grid.Columns.Add(CreateTextColumn(nameof(SectionColumnMappingRow.Order), "Order", 70));
+        grid.Columns.Add(CreateTextColumn(nameof(SectionColumnMappingRow.Unit), "Unit", 70));
+        return grid;
+    }
+
+    private DataGridView CreateSectionRulesGrid()
+    {
+        var grid = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            AutoGenerateColumns = false,
+            AllowUserToAddRows = true,
+            AllowUserToDeleteRows = true,
+            RowHeadersVisible = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            DataSource = _sectionRules,
+        };
+        StyleGrid(grid);
+
+        grid.Columns.Add(CreateTextColumn(nameof(SectionRuleMappingRow.SourceProperty), "Family Property", 120));
+        grid.Columns.Add(CreateTextColumn(nameof(SectionRuleMappingRow.MatchValue), "Match Value"));
+        grid.Columns.Add(CreateTextColumn(nameof(SectionRuleMappingRow.Section), "Output Section"));
         return grid;
     }
 
@@ -201,10 +353,10 @@ internal sealed class BomPreviewShellForm : Form
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             DataSource = _accessoryRules,
         };
+        StyleGrid(grid);
 
-        grid.Columns.Add(CreateTextColumn(nameof(AccessoryMappingRow.SourceProperty), "Accessory Property"));
-        grid.Columns.Add(CreateTextColumn(nameof(AccessoryMappingRow.DisplayName), "Accessory Row Description"));
-        grid.Columns.Add(CreateTextColumn(nameof(AccessoryMappingRow.BomSection), "BOM Section"));
+        grid.Columns.Add(CreateTextColumn(nameof(AccessoryMappingRow.SourceProperty), "Quantity Property"));
+        grid.Columns.Add(CreateTextColumn(nameof(AccessoryMappingRow.DisplayName), "Accessory Name"));
         return grid;
     }
 
@@ -235,9 +387,65 @@ internal sealed class BomPreviewShellForm : Form
         var page = new TabPage("Selected Properties")
         {
             Name = "SelectedPropertiesTab",
+            BackColor = ShellBackColor,
         };
-        page.Controls.Add(_selectedPropertiesGrid);
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(8),
+            BackColor = ShellBackColor,
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+        var commands = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            WrapContents = true,
+            BackColor = ShellBackColor,
+        };
+        commands.Controls.Add(CreateActionButton("Read Selected Part", (_, _) => ReadSelectedPartProperties(), accent: true));
+        commands.Controls.Add(CreateActionButton("Add Property To Active Family", (_, _) => AddSelectedPartPropertyToMapping()));
+        commands.Controls.Add(CreateActionButton("Scan Assembly", (_, _) => ScanActiveAssembly()));
+
+        var hint = new Label
+        {
+            AutoSize = true,
+            ForeColor = ShellMutedTextColor,
+            Padding = new Padding(8, 7, 0, 0),
+            Text = "Select part in SolidWorks, read properties here, then add highlighted property to active family tab in BOM Mapping.",
+        };
+        commands.Controls.Add(hint);
+
+        layout.Controls.Add(commands, 0, 0);
+        layout.Controls.Add(_selectedPropertiesTabs, 0, 1);
+
+        page.Controls.Add(layout);
         return page;
+    }
+
+    private TabControl CreateSelectedPropertiesTabs()
+    {
+        var tabs = new TabControl
+        {
+            Dock = DockStyle.Fill,
+        };
+
+        foreach (var scope in GetPropertyScopeDisplayOrder())
+        {
+            var scopePage = new TabPage(GetPropertyScopeTabText(scope))
+            {
+                Name = $"{scope}PropertiesTab",
+            };
+            scopePage.Controls.Add(_selectedPropertyGrids[scope]);
+            tabs.TabPages.Add(scopePage);
+        }
+
+        return tabs;
     }
 
     private TabPage CreateMappingTab()
@@ -245,78 +453,115 @@ internal sealed class BomPreviewShellForm : Form
         var page = new TabPage("BOM Mapping")
         {
             Name = "MappingTab",
+            BackColor = ShellBackColor,
         };
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 4,
+            ColumnCount = 3,
+            RowCount = 1,
             Padding = new Padding(4),
+            BackColor = ShellBackColor,
         };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 240F));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 55F));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 45F));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 260F));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58F));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42F));
 
-        var discoveredLabel = new Label
+        var discoveredGroup = new GroupBox
         {
             Dock = DockStyle.Fill,
-            AutoSize = true,
-            Padding = new Padding(0, 0, 0, 6),
-            Text = "Discovered assembly properties",
-        };
-
-        var mappingNote = new Label
-        {
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            Padding = new Padding(0, 0, 0, 6),
-            Text = "Pipe columns drive grouping. NumGaskets and NumClamps belong in accessory rules so they generate separate accessory rows.",
-        };
-
-        var saveMappingButton = new Button
-        {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Padding = new Padding(10, 6, 10, 6),
-            Text = "Save Mapping",
-            UseVisualStyleBackColor = true,
-        };
-        saveMappingButton.Click += (_, _) => SaveMapping();
-
-        var mappingHeader = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-        };
-        mappingHeader.Controls.Add(mappingNote);
-        mappingHeader.Controls.Add(saveMappingButton);
-
-        var pipeGroup = new GroupBox
-        {
-            Dock = DockStyle.Fill,
-            Text = "Pipe Columns",
+            Text = "Discovered Properties",
             Padding = new Padding(8),
+            BackColor = ShellSurfaceColor,
+            ForeColor = ShellTextColor,
         };
-        pipeGroup.Controls.Add(_pipeColumnsGrid);
+        discoveredGroup.Controls.Add(_discoveredPropertiesList);
 
-        var accessoryGroup = new GroupBox
+        var center = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            Text = "Accessory Rules",
-            Padding = new Padding(8),
+            ColumnCount = 1,
+            RowCount = 3,
+            BackColor = ShellBackColor,
         };
-        accessoryGroup.Controls.Add(_accessoryRulesGrid);
+        center.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        center.RowStyles.Add(new RowStyle(SizeType.Absolute, 130F));
+        center.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        layout.Controls.Add(discoveredLabel, 0, 0);
-        layout.Controls.Add(mappingHeader, 1, 0);
-        layout.Controls.Add(_discoveredPropertiesList, 0, 1);
-        layout.SetRowSpan(_discoveredPropertiesList, 3);
-        layout.Controls.Add(pipeGroup, 1, 1);
-        layout.Controls.Add(new Label { AutoSize = true, Text = "Accessory rows emitted from numeric properties" }, 1, 2);
-        layout.Controls.Add(accessoryGroup, 1, 3);
+        var sectionGroup = new GroupBox
+        {
+            Dock = DockStyle.Fill,
+            Text = "Section Columns",
+            Padding = new Padding(8),
+            BackColor = ShellSurfaceColor,
+            ForeColor = ShellTextColor,
+        };
+        sectionGroup.Controls.Add(_sectionTabs);
+
+        var rulesGroup = new GroupBox
+        {
+            Dock = DockStyle.Fill,
+            Text = "Primary Family Rules",
+            Padding = new Padding(8),
+            BackColor = ShellSurfaceColor,
+            ForeColor = ShellTextColor,
+        };
+        rulesGroup.Controls.Add(_sectionRulesGrid);
+
+        var centerCommands = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            WrapContents = true,
+        };
+        centerCommands.BackColor = ShellBackColor;
+        centerCommands.Controls.Add(CreateActionButton("Add Discovered Column", (_, _) => AddSelectedDiscoveredProperty()));
+        centerCommands.Controls.Add(CreateActionButton("Remove Selected Column", (_, _) => RemoveSelectedSectionColumn()));
+        centerCommands.Controls.Add(CreateActionButton("Refresh Preview", (_, _) => RefreshMappingPreview(), accent: true));
+        centerCommands.Controls.Add(CreateActionButton("Import Settings", (_, _) => ImportSettings()));
+        centerCommands.Controls.Add(CreateActionButton("Export Settings", (_, _) => ExportSettings()));
+        centerCommands.Controls.Add(CreateActionButton("Save Mapping Profile", (_, _) => SaveMapping()));
+
+        center.Controls.Add(sectionGroup, 0, 0);
+        center.Controls.Add(rulesGroup, 0, 1);
+        center.Controls.Add(centerCommands, 0, 2);
+
+        var right = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            BackColor = ShellBackColor,
+        };
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 60F));
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 40F));
+
+        var previewGroup = new GroupBox
+        {
+            Dock = DockStyle.Fill,
+            Text = "Live Preview",
+            Padding = new Padding(8),
+            BackColor = ShellSurfaceColor,
+            ForeColor = ShellTextColor,
+        };
+        previewGroup.Controls.Add(_mappingPreviewGrid);
+
+        var diagnosticsGroup = new GroupBox
+        {
+            Dock = DockStyle.Fill,
+            Text = "Diagnostics",
+            Padding = new Padding(8),
+            BackColor = ShellSurfaceColor,
+            ForeColor = ShellTextColor,
+        };
+        diagnosticsGroup.Controls.Add(_mappingDiagnosticsGrid);
+
+        right.Controls.Add(previewGroup, 0, 0);
+        right.Controls.Add(diagnosticsGroup, 0, 1);
+
+        layout.Controls.Add(discoveredGroup, 0, 0);
+        layout.Controls.Add(center, 1, 0);
+        layout.Controls.Add(right, 2, 0);
 
         page.Controls.Add(layout);
         return page;
@@ -327,6 +572,7 @@ internal sealed class BomPreviewShellForm : Form
         var page = new TabPage("BOM Preview")
         {
             Name = "PreviewTab",
+            BackColor = ShellBackColor,
         };
         page.Controls.Add(_previewGrid);
         return page;
@@ -337,6 +583,7 @@ internal sealed class BomPreviewShellForm : Form
         var page = new TabPage("Diagnostics")
         {
             Name = "DiagnosticsTab",
+            BackColor = ShellBackColor,
         };
         page.Controls.Add(_diagnosticsGrid);
         return page;
@@ -349,22 +596,24 @@ internal sealed class BomPreviewShellForm : Form
             var properties = _addin.SelectedComponentPropertyReader?.ReadSelectedComponentProperties()
                 ?? throw new InvalidOperationException("Selected component property reader is unavailable.");
 
-            var table = new DataTable();
-            table.Columns.Add("Name");
-            table.Columns.Add("Value");
-            table.Columns.Add("Scope");
-            table.Columns.Add("Source");
-
-            foreach (var property in properties.OrderBy(property => property.Name, StringComparer.OrdinalIgnoreCase))
+            foreach (var scope in GetPropertyScopeDisplayOrder())
             {
-                table.Rows.Add(
-                    property.Name,
-                    property.EffectiveValue,
-                    property.Scope.ToString(),
-                    property.Source ?? string.Empty);
+                var table = CreateSelectedPropertiesTable();
+                foreach (var property in properties
+                             .Where(property => property.Scope == scope)
+                             .OrderBy(property => property.Name, StringComparer.OrdinalIgnoreCase)
+                             .ThenBy(property => property.Source, StringComparer.OrdinalIgnoreCase))
+                {
+                    table.Rows.Add(
+                        property.Name,
+                        property.EffectiveValue,
+                        property.RawValue ?? string.Empty,
+                        property.Source ?? string.Empty);
+                }
+
+                _selectedPropertyGrids[scope].DataSource = table;
             }
 
-            _selectedPropertiesGrid.DataSource = table;
             _tabControl.SelectedTab = _tabControl.TabPages["SelectedPropertiesTab"] ?? _tabControl.TabPages[0];
             SetStatus(properties.Count == 0
                 ? "No selected part properties were returned."
@@ -411,6 +660,7 @@ internal sealed class BomPreviewShellForm : Form
             var discovery = _propertyDiscoveryService.DiscoverFromComponents(_scannedComponents);
             BindProfile(_currentProfile, discovery);
             BindDiagnostics(_profileDiagnostics);
+            BindMappingDiagnostics(_profileDiagnostics);
             UpdateSummary();
 
             _tabControl.SelectedTab = _tabControl.TabPages["MappingTab"] ?? _tabControl.TabPages[1];
@@ -449,8 +699,10 @@ internal sealed class BomPreviewShellForm : Form
 
             BindPreview(result);
             BindDiagnostics(diagnostics);
+            BindMappingPreview(result);
+            BindMappingDiagnostics(diagnostics);
             _tabControl.SelectedTab = _tabControl.TabPages["PreviewTab"] ?? _tabControl.TabPages[2];
-            SetStatus($"Generated {result.Rows.Count} BOM row(s) using {profile.PipeColumns.Count} pipe column rule(s) and {profile.AccessoryRules.Count} accessory rule(s).");
+            SetStatus($"Generated {result.Rows.Count} BOM row(s) using {profile.GetEffectiveSectionColumnProfiles().Sum(section => section.Columns.Count)} section column rule(s) and {profile.AccessoryRules.Count} accessory rule(s).");
         }
         catch (Exception ex)
         {
@@ -506,6 +758,8 @@ internal sealed class BomPreviewShellForm : Form
 
             BindPreview(result);
             BindDiagnostics(diagnostics);
+            BindMappingPreview(result);
+            BindMappingDiagnostics(diagnostics);
             _tabControl.SelectedTab = _tabControl.TabPages["PreviewTab"] ?? _tabControl.TabPages[2];
             SetStatus($"Exported {result.Rows.Count} BOM row(s) to {dialog.FileName}.");
         }
@@ -525,6 +779,7 @@ internal sealed class BomPreviewShellForm : Form
             _profileSourcePath = targetPath;
             _profileDiagnostics = BomProfileSerializer.Validate(profile);
             BindDiagnostics(_profileDiagnostics);
+            BindMappingDiagnostics(_profileDiagnostics);
             UpdateSummary();
             SetStatus($"Saved BOM mapping to {targetPath}.");
         }
@@ -542,12 +797,53 @@ internal sealed class BomPreviewShellForm : Form
         _profileDiagnostics = profileLoadResult.Diagnostics;
         BindProfile(_currentProfile, discovery: null);
         BindDiagnostics(_profileDiagnostics);
+        BindMappingDiagnostics(_profileDiagnostics);
         UpdateSummary();
     }
 
     private ProfileLoadResult LoadEffectiveProfile(string? assemblyPath)
     {
         var options = BuildProfileStoreOptions();
+        if (!string.IsNullOrWhiteSpace(_externalSettingsPath) && File.Exists(_externalSettingsPath))
+        {
+            try
+            {
+                var externalProfile = _profileStore.LoadFromPath(_externalSettingsPath);
+                var diagnostics = BomProfileSerializer.Validate(externalProfile);
+                if (diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+                {
+                    return LoadBuiltInProfileWithDiagnostics(
+                        options.DefaultProfilePath,
+                        diagnostics.Prepend(new BomDiagnostic
+                        {
+                            Severity = DiagnosticSeverity.Warning,
+                            Code = "external-settings-invalid",
+                            Message = $"Settings file '{_externalSettingsPath}' is invalid. Falling back to the built-in default profile.",
+                        }));
+                }
+
+                return new ProfileLoadResult
+                {
+                    Profile = externalProfile,
+                    SourcePath = _externalSettingsPath,
+                    Diagnostics = diagnostics,
+                };
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+            {
+                return LoadBuiltInProfileWithDiagnostics(
+                    options.DefaultProfilePath,
+                    [
+                        new BomDiagnostic
+                        {
+                            Severity = DiagnosticSeverity.Warning,
+                            Code = "external-settings-load-failed",
+                            Message = $"Settings file '{_externalSettingsPath}' could not be loaded. Falling back to the built-in default profile.",
+                        },
+                    ]);
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(assemblyPath))
         {
             return _profileStore.LoadEffectiveProfile(assemblyPath, options);
@@ -566,7 +862,7 @@ internal sealed class BomPreviewShellForm : Form
     {
         return new ProfileStoreOptions
         {
-            DefaultProfilePath = Path.Combine(AppContext.BaseDirectory, "profiles", "default.pipebom.json"),
+            DefaultProfilePath = Path.Combine(GetAddinDirectory(), "profiles", "default.pipebom.json"),
             UserProfileDirectory = Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
                 "AFCA",
@@ -580,10 +876,31 @@ internal sealed class BomPreviewShellForm : Form
         };
     }
 
+    private ProfileLoadResult LoadBuiltInProfileWithDiagnostics(string defaultProfilePath, IEnumerable<BomDiagnostic> diagnostics)
+    {
+        var profile = _profileStore.LoadFromPath(defaultProfilePath);
+        var mergedDiagnostics = diagnostics
+            .Concat(BomProfileSerializer.Validate(profile))
+            .ToList();
+
+        return new ProfileLoadResult
+        {
+            Profile = profile,
+            SourcePath = defaultProfilePath,
+            Diagnostics = mergedDiagnostics,
+        };
+    }
+
+    private static string GetAddinDirectory()
+    {
+        return Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)
+            ?? AppContext.BaseDirectory;
+    }
+
     private void BindProfile(BomProfile profile, PropertyDiscoveryResult? discovery)
     {
         _pipeColumns.Clear();
-        foreach (var column in profile.PipeColumns.OrderBy(column => column.Order))
+        foreach (var column in profile.GetSectionColumns(KnownBomSections.Pipes).OrderBy(column => column.Order))
         {
             _pipeColumns.Add(new PipeColumnMappingRow
             {
@@ -596,6 +913,39 @@ internal sealed class BomPreviewShellForm : Form
             });
         }
 
+        foreach (var section in KnownBomSections.ConfigurableSections)
+        {
+            if (!_sectionColumnsBySection.TryGetValue(section, out var rows))
+            {
+                continue;
+            }
+
+            rows.Clear();
+            foreach (var column in profile.GetSectionColumns(section).OrderBy(column => column.Order))
+            {
+                rows.Add(new SectionColumnMappingRow
+                {
+                    SourceProperty = column.SourceProperty,
+                    DisplayName = column.DisplayName,
+                    Enabled = column.Enabled,
+                    GroupBy = column.GroupBy,
+                    Order = column.Order,
+                    Unit = column.Unit ?? string.Empty,
+                });
+            }
+        }
+
+        _sectionRules.Clear();
+        foreach (var rule in profile.GetEffectiveSectionRules())
+        {
+            _sectionRules.Add(new SectionRuleMappingRow
+            {
+                SourceProperty = string.IsNullOrWhiteSpace(rule.SourceProperty) ? KnownPropertyNames.PrimaryFamily : rule.SourceProperty,
+                MatchValue = rule.MatchValue,
+                Section = KnownBomSections.NormalizeConfigurableSection(rule.Section),
+            });
+        }
+
         _accessoryRules.Clear();
         foreach (var accessoryRule in profile.AccessoryRules)
         {
@@ -603,7 +953,7 @@ internal sealed class BomPreviewShellForm : Form
             {
                 SourceProperty = accessoryRule.SourceProperty,
                 DisplayName = accessoryRule.DisplayName,
-                BomSection = string.IsNullOrWhiteSpace(accessoryRule.BomSection) ? KnownBomSections.PipeAccessories : accessoryRule.BomSection,
+                BomSection = KnownBomSections.NormalizeAccessorySection(accessoryRule.BomSection),
             });
         }
 
@@ -611,16 +961,60 @@ internal sealed class BomPreviewShellForm : Form
         _discoveredPropertiesList.Items.Clear();
         if (discovery is not null)
         {
-            foreach (var propertyName in discovery.DiscoveredProperties)
+            foreach (var propertyName in BuildDiscoveredPropertyItems(discovery.DiscoveredProperties))
             {
                 _discoveredPropertiesList.Items.Add(propertyName);
             }
         }
         _discoveredPropertiesList.EndUpdate();
         UpdateSummary();
+        TryRefreshMappingPreview();
+    }
+
+    private void LoadSettingsFile(string path, bool persistAsActiveSettings)
+    {
+        var profile = _profileStore.LoadFromPath(path);
+        var diagnostics = BomProfileSerializer.Validate(profile);
+        if (diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+        {
+            throw new InvalidOperationException($"Settings file '{path}' contains invalid BOM profile settings.");
+        }
+
+        _currentProfile = profile;
+        _profileSourcePath = path;
+        _profileDiagnostics = diagnostics;
+        if (persistAsActiveSettings)
+        {
+            ActivateExternalSettingsPath(path);
+        }
+
+        var discovery = _scannedComponents.Count == 0
+            ? null
+            : _propertyDiscoveryService.DiscoverFromComponents(_scannedComponents);
+        BindProfile(_currentProfile, discovery);
+        BindDiagnostics(_profileDiagnostics);
+        BindMappingDiagnostics(_profileDiagnostics);
+        UpdateSummary();
+        TryRefreshMappingPreview();
+    }
+
+    private void ActivateExternalSettingsPath(string path)
+    {
+        _externalSettingsPath = path;
+        SaveConfiguredSettingsPath(path);
     }
 
     private void BindPreview(BomResult result)
+    {
+        _previewGrid.DataSource = BuildPreviewTable(result);
+    }
+
+    private void BindMappingPreview(BomResult result)
+    {
+        _mappingPreviewGrid.DataSource = BuildPreviewTable(result);
+    }
+
+    private static DataTable BuildPreviewTable(BomResult result)
     {
         var headers = CollectHeaders(result.Rows);
         var table = new DataTable();
@@ -647,10 +1041,20 @@ internal sealed class BomPreviewShellForm : Form
             table.Rows.Add(item);
         }
 
-        _previewGrid.DataSource = table;
+        return table;
     }
 
     private void BindDiagnostics(IEnumerable<BomDiagnostic> diagnostics)
+    {
+        _diagnosticsGrid.DataSource = BuildDiagnosticsTable(diagnostics);
+    }
+
+    private void BindMappingDiagnostics(IEnumerable<BomDiagnostic> diagnostics)
+    {
+        _mappingDiagnosticsGrid.DataSource = BuildDiagnosticsTable(diagnostics);
+    }
+
+    private static DataTable BuildDiagnosticsTable(IEnumerable<BomDiagnostic> diagnostics)
     {
         var table = new DataTable();
         table.Columns.Add("Severity");
@@ -669,7 +1073,7 @@ internal sealed class BomPreviewShellForm : Form
                 diagnostic.PropertyName ?? string.Empty);
         }
 
-        _diagnosticsGrid.DataSource = table;
+        return table;
     }
 
     private void UpdateSummary()
@@ -679,7 +1083,31 @@ internal sealed class BomPreviewShellForm : Form
             ? $"Scanned: {_componentsScanned} | Loaded: {_scannedComponents.Count} | Skipped: {_componentsSkipped ?? 0}"
             : $"Loaded: {_scannedComponents.Count}";
         _summaryLabel.Text = $"Assembly: {assemblyText} | {componentSummary}";
-        _profileLabel.Text = $"Profile: {_profileSourcePath ?? "Built-in default"} | Accessory reminder: NumGaskets and NumClamps emit accessory rows.";
+        var settingsText = string.IsNullOrWhiteSpace(_externalSettingsPath)
+            ? "Local/default lookup"
+            : _externalSettingsPath;
+        _profileLabel.Text = $"Profile: {_profileSourcePath ?? "Built-in default"} | Settings file: {settingsText} | Sections: {string.Join(", ", KnownBomSections.ConfigurableSections)}";
+    }
+
+    private IReadOnlyList<string> BuildDiscoveredPropertyItems(IEnumerable<string> propertyNames)
+    {
+        var propertyScopeByName = _scannedComponents
+            .SelectMany(component => component.Properties.Values)
+            .GroupBy(property => property.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(property => property.Scope).FirstOrDefault(),
+                StringComparer.OrdinalIgnoreCase);
+
+        return propertyNames
+            .OrderBy(propertyName => propertyScopeByName.TryGetValue(propertyName, out var scope) ? scope : PropertyScope.Unknown)
+            .ThenBy(propertyName => propertyName, StringComparer.OrdinalIgnoreCase)
+            .Select(propertyName =>
+            {
+                var scope = propertyScopeByName.TryGetValue(propertyName, out var knownScope) ? knownScope : PropertyScope.Unknown;
+                return $"{scope}: {propertyName}";
+            })
+            .ToList();
     }
 
     private void SetStatus(string message)
@@ -696,10 +1124,68 @@ internal sealed class BomPreviewShellForm : Form
     private BomProfile BuildProfileFromEditor()
     {
         _pipeColumnsGrid.EndEdit();
+        _sectionRulesGrid.EndEdit();
         _accessoryRulesGrid.EndEdit();
+        foreach (var grid in _sectionColumnGrids.Values)
+        {
+            grid.EndEdit();
+        }
 
+        var sectionProfiles = KnownBomSections.ConfigurableSections
+            .Select(section => new BomSectionColumnProfile
+            {
+                Section = section,
+                Columns = BuildSectionColumns(section),
+            })
+            .ToList();
+
+        var pipeColumns = sectionProfiles
+            .First(profile => string.Equals(profile.Section, KnownBomSections.Pipes, StringComparison.OrdinalIgnoreCase))
+            .Columns;
+
+        var sectionRules = _sectionRules
+            .Where(row => !string.IsNullOrWhiteSpace(row.MatchValue) && !string.IsNullOrWhiteSpace(row.Section))
+            .Select(row => new BomSectionRule
+            {
+                SourceProperty = string.IsNullOrWhiteSpace(row.SourceProperty) ? KnownPropertyNames.PrimaryFamily : row.SourceProperty.Trim(),
+                MatchValue = row.MatchValue.Trim(),
+                Section = KnownBomSections.NormalizeConfigurableSection(row.Section.Trim()),
+            })
+            .ToList();
+
+        var accessoryRules = _accessoryRules
+            .Where(row => !string.IsNullOrWhiteSpace(row.SourceProperty) && !string.IsNullOrWhiteSpace(row.DisplayName))
+            .Select(row => new AccessoryRule
+            {
+                SourceProperty = row.SourceProperty.Trim(),
+                DisplayName = row.DisplayName.Trim(),
+                BomSection = KnownBomSections.NormalizeAccessorySection(row.BomSection),
+            })
+            .ToList();
+
+        _currentProfile = _currentProfile with
+        {
+            PipeColumns = pipeColumns,
+            SectionColumnProfiles = sectionProfiles,
+            SectionRules = sectionRules,
+            AccessoryRules = accessoryRules,
+            ProfileName = string.IsNullOrWhiteSpace(_currentProfile.ProfileName) ? "AFCA Pipe BOM" : _currentProfile.ProfileName,
+            Version = Math.Max(_currentProfile.Version, 2),
+        };
+
+        _profileDiagnostics = BomProfileSerializer.Validate(_currentProfile);
+        return _currentProfile;
+    }
+
+    private IReadOnlyList<BomColumnRule> BuildSectionColumns(string section)
+    {
         var orderFallback = 1;
-        var pipeColumns = _pipeColumns
+        if (!_sectionColumnsBySection.TryGetValue(section, out var rows))
+        {
+            return KnownBomColumnProfiles.CreateDefaultSectionColumns(section);
+        }
+
+        return rows
             .Where(row => !string.IsNullOrWhiteSpace(row.SourceProperty) && !string.IsNullOrWhiteSpace(row.DisplayName))
             .Select(row => new BomColumnRule
             {
@@ -712,31 +1198,302 @@ internal sealed class BomPreviewShellForm : Form
             })
             .OrderBy(column => column.Order)
             .ToList();
+    }
 
-        var accessoryRules = _accessoryRules
-            .Where(row => !string.IsNullOrWhiteSpace(row.SourceProperty) && !string.IsNullOrWhiteSpace(row.DisplayName))
-            .Select(row => new AccessoryRule
+    private void AddSelectedDiscoveredProperty()
+    {
+        if (_discoveredPropertiesList.SelectedItem is not string selectedItem)
+        {
+            SetStatus("Select a discovered property first.");
+            return;
+        }
+
+        var propertyName = selectedItem.Contains(":", StringComparison.Ordinal)
+            ? selectedItem[(selectedItem.IndexOf(":", StringComparison.Ordinal) + 1)..].Trim()
+            : selectedItem.Trim();
+
+        if (string.IsNullOrWhiteSpace(propertyName))
+        {
+            return;
+        }
+
+        AddPropertyToActiveSection(propertyName);
+    }
+
+    private void AddSelectedPartPropertyToMapping()
+    {
+        if (!TryGetSelectedPartPropertyName(out var propertyName))
+        {
+            SetStatus("Select a property row first, or read the selected SolidWorks part.");
+            return;
+        }
+
+        AddPropertyToActiveSection(propertyName);
+        _tabControl.SelectedTab = _tabControl.TabPages["MappingTab"] ?? _tabControl.TabPages[1];
+    }
+
+    private void AddPropertyToActiveSection(string propertyName)
+    {
+        var section = _sectionTabs.SelectedTab?.Text ?? KnownBomSections.Components;
+        if (string.Equals(section, KnownBomSections.OtherAccessories, StringComparison.OrdinalIgnoreCase))
+        {
+            _accessoryRules.Add(new AccessoryMappingRow
             {
-                SourceProperty = row.SourceProperty.Trim(),
-                DisplayName = row.DisplayName.Trim(),
-                BomSection = string.IsNullOrWhiteSpace(row.BomSection) ? KnownBomSections.PipeAccessories : row.BomSection.Trim(),
-            })
+                SourceProperty = propertyName,
+                DisplayName = propertyName,
+                BomSection = KnownBomSections.OtherAccessories,
+            });
+            RefreshMappingPreview();
+            SetStatus($"Added '{propertyName}' to {KnownBomSections.OtherAccessories}. Save mapping profile to persist.");
+            return;
+        }
+
+        if (!_sectionColumnsBySection.TryGetValue(section, out var rows))
+        {
+            return;
+        }
+
+        rows.Add(new SectionColumnMappingRow
+        {
+            SourceProperty = propertyName,
+            DisplayName = propertyName,
+            Enabled = true,
+            GroupBy = true,
+            Order = rows.Count == 0 ? 1 : rows.Max(row => row.Order) + 1,
+        });
+
+        RefreshMappingPreview();
+        SetStatus($"Added '{propertyName}' to {section} columns. Save mapping profile to persist.");
+    }
+
+    private void RemoveSelectedSectionColumn()
+    {
+        var section = _sectionTabs.SelectedTab?.Text ?? KnownBomSections.Components;
+        if (string.Equals(section, KnownBomSections.OtherAccessories, StringComparison.OrdinalIgnoreCase))
+        {
+            RemoveSelectedAccessoryRule();
+            return;
+        }
+
+        if (!_sectionColumnsBySection.TryGetValue(section, out var rows)
+            || !_sectionColumnGrids.TryGetValue(section, out var grid))
+        {
+            return;
+        }
+
+        var removed = 0;
+        foreach (DataGridViewRow selectedRow in grid.SelectedRows.Cast<DataGridViewRow>().Where(row => !row.IsNewRow).ToList())
+        {
+            if (selectedRow.DataBoundItem is not SectionColumnMappingRow row)
+            {
+                continue;
+            }
+
+            rows.Remove(row);
+            removed++;
+        }
+
+        if (removed == 0)
+        {
+            SetStatus("Select one or more columns in the active family tab before removing.");
+            return;
+        }
+
+        RefreshMappingPreview();
+        SetStatus($"Removed {removed} column{(removed == 1 ? string.Empty : "s")} from {section}. Save mapping profile to persist.");
+    }
+
+    private void RemoveSelectedAccessoryRule()
+    {
+        var removed = 0;
+        foreach (DataGridViewRow selectedRow in _accessoryRulesGrid.SelectedRows.Cast<DataGridViewRow>().Where(row => !row.IsNewRow).ToList())
+        {
+            if (selectedRow.DataBoundItem is not AccessoryMappingRow row)
+            {
+                continue;
+            }
+
+            _accessoryRules.Remove(row);
+            removed++;
+        }
+
+        if (removed == 0)
+        {
+            SetStatus($"Select one or more rules in {KnownBomSections.OtherAccessories} before removing.");
+            return;
+        }
+
+        RefreshMappingPreview();
+        SetStatus($"Removed {removed} accessory rule{(removed == 1 ? string.Empty : "s")}. Save mapping profile to persist.");
+    }
+
+    private bool TryGetSelectedPartPropertyName(out string propertyName)
+    {
+        propertyName = string.Empty;
+        var grid = _selectedPropertiesTabs.SelectedTab?.Controls.OfType<DataGridView>().FirstOrDefault();
+        var row = grid?.SelectedRows.Cast<DataGridViewRow>().FirstOrDefault(row => !row.IsNewRow)
+            ?? grid?.CurrentRow;
+
+        if (row is null || row.IsNewRow)
+        {
+            return false;
+        }
+
+        propertyName = Convert.ToString(row.Cells["Property"].Value, CultureInfo.InvariantCulture)?.Trim() ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(propertyName);
+    }
+
+    private void TryRefreshMappingPreview()
+    {
+        if (_scannedComponents.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            RefreshMappingPreview();
+        }
+        catch
+        {
+            // Editing grids can briefly contain invalid values; explicit preview/export will surface the error.
+        }
+    }
+
+    private void ImportSettings()
+    {
+        try
+        {
+            using var dialog = new OpenFileDialog
+            {
+                AddExtension = true,
+                CheckFileExists = true,
+                DefaultExt = "json",
+                Filter = BuildSettingsFileFilter(),
+                InitialDirectory = ResolveSettingsDialogDirectory(),
+                Title = "Import BOMPipe settings",
+            };
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                SetStatus("Settings import cancelled.");
+                return;
+            }
+
+            LoadSettingsFile(dialog.FileName, persistAsActiveSettings: true);
+            SetStatus($"Imported settings from {dialog.FileName}. Future saves use this settings file.");
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+    }
+
+    private void ExportSettings()
+    {
+        try
+        {
+            using var dialog = new SaveFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = "pipebom.json",
+                Filter = BuildSettingsFileFilter(),
+                FileName = BuildDefaultSettingsFileName(),
+                InitialDirectory = ResolveSettingsDialogDirectory(),
+                OverwritePrompt = true,
+                Title = "Export BOMPipe settings",
+            };
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                SetStatus("Settings export cancelled.");
+                return;
+            }
+
+            var profile = BuildProfileFromEditor();
+            _profileStore.SaveToPath(profile, dialog.FileName);
+            ActivateExternalSettingsPath(dialog.FileName);
+            _currentProfile = profile;
+            _profileDiagnostics = BomProfileSerializer.Validate(profile);
+            _profileSourcePath = dialog.FileName;
+            BindDiagnostics(_profileDiagnostics);
+            BindMappingDiagnostics(_profileDiagnostics);
+            UpdateSummary();
+            SetStatus($"Exported settings to {dialog.FileName}. Future saves use this settings file.");
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+    }
+
+    private void SetSettingsFile()
+    {
+        try
+        {
+            using var dialog = new SaveFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = "pipebom.json",
+                Filter = BuildSettingsFileFilter(),
+                FileName = BuildDefaultSettingsFileName(),
+                InitialDirectory = ResolveSettingsDialogDirectory(),
+                OverwritePrompt = false,
+                Title = "Choose BOMPipe settings file",
+            };
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                SetStatus("Settings file selection cancelled.");
+                return;
+            }
+
+            ActivateExternalSettingsPath(dialog.FileName);
+            if (File.Exists(dialog.FileName))
+            {
+                LoadSettingsFile(dialog.FileName, persistAsActiveSettings: true);
+                SetStatus($"Using settings file {dialog.FileName}.");
+                return;
+            }
+
+            _profileSourcePath = dialog.FileName;
+            UpdateSummary();
+            SetStatus($"Settings file set to {dialog.FileName}. Save mapping profile to create it.");
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+    }
+
+    private void RefreshMappingPreview()
+    {
+        if (_scannedComponents.Count == 0)
+        {
+            BindMappingPreview(new BomResult());
+            BindMappingDiagnostics(_profileDiagnostics);
+            SetStatus("Scan an assembly to populate the live preview.");
+            return;
+        }
+
+        var profile = BuildProfileFromEditor();
+        var result = _bomGenerator.Generate(_scannedComponents, profile);
+        var diagnostics = _profileDiagnostics
+            .Concat(result.Diagnostics)
             .ToList();
 
-        _currentProfile = _currentProfile with
-        {
-            PipeColumns = pipeColumns,
-            AccessoryRules = accessoryRules,
-            ProfileName = string.IsNullOrWhiteSpace(_currentProfile.ProfileName) ? "AFCA Pipe BOM" : _currentProfile.ProfileName,
-            Version = _currentProfile.Version <= 0 ? 1 : _currentProfile.Version,
-        };
-
-        _profileDiagnostics = BomProfileSerializer.Validate(_currentProfile);
-        return _currentProfile;
+        BindMappingPreview(result);
+        BindMappingDiagnostics(diagnostics);
+        SetStatus($"Preview refreshed with {result.Rows.Count} BOM row(s).");
     }
 
     private string ResolveProfileSavePath()
     {
+        if (!string.IsNullOrWhiteSpace(_externalSettingsPath))
+        {
+            return _externalSettingsPath;
+        }
+
         if (!string.IsNullOrWhiteSpace(_assemblyPath))
         {
             return Path.Combine(Path.GetDirectoryName(_assemblyPath)!, BuildProfileStoreOptions().DefaultProfileFileName);
@@ -770,6 +1527,86 @@ internal sealed class BomPreviewShellForm : Form
         }
 
         return System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments);
+    }
+
+    private string ResolveSettingsDialogDirectory()
+    {
+        if (!string.IsNullOrWhiteSpace(_externalSettingsPath))
+        {
+            var directory = Path.GetDirectoryName(_externalSettingsPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                return directory;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(_profileSourcePath))
+        {
+            var directory = Path.GetDirectoryName(_profileSourcePath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                return directory;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(_assemblyPath))
+        {
+            return Path.GetDirectoryName(_assemblyPath)!;
+        }
+
+        return System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments);
+    }
+
+    private string BuildDefaultSettingsFileName()
+    {
+        if (!string.IsNullOrWhiteSpace(_externalSettingsPath))
+        {
+            return Path.GetFileName(_externalSettingsPath);
+        }
+
+        var baseName = !string.IsNullOrWhiteSpace(_assemblyPath)
+            ? Path.GetFileNameWithoutExtension(_assemblyPath)
+            : "bompipe-settings";
+
+        return $"{SanitizeFileName(baseName)}.pipebom.json";
+    }
+
+    private static string BuildSettingsFileFilter()
+    {
+        return "BOMPipe Settings (*.pipebom.json)|*.pipebom.json|JSON (*.json)|*.json|All files (*.*)|*.*";
+    }
+
+    private static string? LoadConfiguredSettingsPath()
+    {
+        var path = GetSettingsPointerPath();
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        var configuredPath = File.ReadAllText(path).Trim();
+        return string.IsNullOrWhiteSpace(configuredPath) ? null : configuredPath;
+    }
+
+    private static void SaveConfiguredSettingsPath(string settingsPath)
+    {
+        var pointerPath = GetSettingsPointerPath();
+        var directory = Path.GetDirectoryName(pointerPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        File.WriteAllText(pointerPath, settingsPath);
+    }
+
+    private static string GetSettingsPointerPath()
+    {
+        return Path.Combine(
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
+            "AFCA",
+            "SolidWorksBOMAddin",
+            "settings-file.path");
     }
 
     private static IBomExporter CreateExporter(string format)
@@ -809,6 +1646,53 @@ internal sealed class BomPreviewShellForm : Form
         return string.Concat(fileName.Select(character => invalidCharacters.Contains(character) ? '_' : character));
     }
 
+    private static Dictionary<PropertyScope, DataGridView> CreateSelectedPropertyGrids()
+    {
+        return GetPropertyScopeDisplayOrder()
+            .ToDictionary(
+                scope => scope,
+                _ =>
+                {
+                    var grid = CreateReadOnlyGrid();
+                    grid.DataSource = CreateSelectedPropertiesTable();
+                    return grid;
+                });
+    }
+
+    private static DataTable CreateSelectedPropertiesTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("Property");
+        table.Columns.Add("Evaluated Value");
+        table.Columns.Add("Raw Value");
+        table.Columns.Add("Source");
+        return table;
+    }
+
+    private static IReadOnlyList<PropertyScope> GetPropertyScopeDisplayOrder()
+    {
+        return
+        [
+            PropertyScope.Configuration,
+            PropertyScope.File,
+            PropertyScope.Component,
+            PropertyScope.CutList,
+            PropertyScope.Unknown,
+        ];
+    }
+
+    private static string GetPropertyScopeTabText(PropertyScope scope)
+    {
+        return scope switch
+        {
+            PropertyScope.Configuration => "Configuration",
+            PropertyScope.File => "Part File",
+            PropertyScope.Component => "Component",
+            PropertyScope.CutList => "Cut List",
+            _ => "Unknown",
+        };
+    }
+
     private sealed class PipeColumnMappingRow
     {
         public string SourceProperty { get; set; } = string.Empty;
@@ -824,12 +1708,36 @@ internal sealed class BomPreviewShellForm : Form
         public string Unit { get; set; } = string.Empty;
     }
 
+    private sealed class SectionColumnMappingRow
+    {
+        public string SourceProperty { get; set; } = string.Empty;
+
+        public string DisplayName { get; set; } = string.Empty;
+
+        public bool Enabled { get; set; } = true;
+
+        public bool GroupBy { get; set; } = true;
+
+        public int Order { get; set; }
+
+        public string Unit { get; set; } = string.Empty;
+    }
+
+    private sealed class SectionRuleMappingRow
+    {
+        public string SourceProperty { get; set; } = KnownPropertyNames.PrimaryFamily;
+
+        public string MatchValue { get; set; } = string.Empty;
+
+        public string Section { get; set; } = KnownBomSections.Other;
+    }
+
     private sealed class AccessoryMappingRow
     {
         public string SourceProperty { get; set; } = string.Empty;
 
         public string DisplayName { get; set; } = string.Empty;
 
-        public string BomSection { get; set; } = KnownBomSections.PipeAccessories;
+        public string BomSection { get; set; } = KnownBomSections.OtherAccessories;
     }
 }

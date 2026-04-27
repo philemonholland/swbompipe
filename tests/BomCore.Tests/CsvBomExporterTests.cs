@@ -40,8 +40,8 @@ public sealed class CsvBomExporterTests
 
         var csv = TestData.ReadUtf8(stream);
 
-        Assert.Contains("Pipe Cut List", csv);
-        Assert.Contains("Pipe Accessories", csv);
+        Assert.Contains("Pipes", csv);
+        Assert.Contains("Other Accessories", csv);
         Assert.Contains("BOM Code,Pipe Description,Quantity", csv);
         Assert.Contains("B-100,Line A,2", csv);
         Assert.Contains("Description,Quantity", csv);

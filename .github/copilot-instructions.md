@@ -1,42 +1,39 @@
 # Copilot Instructions
 
-This repository is still at the planning stage: the only tracked source file today is `README.md`, and the main implementation brief defines a future SolidWorks BOM add-in rather than an existing solution. Do not assume a buildable project already exists; scaffolding the solution may be part of the work.
-
 ## Build, test, and lint
 
-No build, test, or lint commands are currently defined in the tracked repository. There is no `.sln`, project file, or existing test suite yet, so do not invent commands in follow-up work.
+The repository is pinned to .NET SDK `8.0.420` via `global.json`. `BomCore` targets `net8.0`, the SolidWorks-facing projects target `net8.0-windows`, and the PDM Professional projects target `net48`.
+
+```powershell
+dotnet restore .\SolidWorksBOMAddin.sln
+dotnet build .\SolidWorksBOMAddin.sln
+dotnet test .\SolidWorksBOMAddin.sln
+dotnet test .\tests\BomCore.Tests\BomCore.Tests.csproj --filter "FullyQualifiedName~BomCore.Tests.BomGeneratorTests.Generate_SeparatesPipesWithDifferentLengths"
+```
+
+There is no dedicated lint command checked into the repository today. Ordinary automated coverage lives in `tests\BomCore.Tests`; SolidWorks and PDM flows still require local manual validation.
 
 ## High-level architecture
 
-The planned product is a C# SolidWorks add-in named **AFCA Piping BOM Generator**. Its job is to scan a SolidWorks piping assembly, read component properties, apply a persistent property-mapping profile, generate grouped BOM rows, and export the result to CSV and XLSX.
+`SolidWorksBOMAddin.sln` contains five product projects plus `tests\BomCore.Tests`:
 
-Future work should not assume the only entry point is an in-session SolidWorks add-in command. The intended user experience also includes opening BOMPipe directly from Windows Explorer or from PDM by right-clicking an assembly, so keep launch/orchestration concerns separate from the core BOM pipeline.
+- `src\BomCore` is the reusable domain layer. It owns profile serialization/loading, property discovery, BOM grouping, diagnostics, CSV/XLSX export, and debug-report generation.
+- `src\SolidWorksBOMAddin` is the SolidWorks COM add-in and WinForms shell. It exposes **Pipe BOM > Open BOM Preview Shell** and composes `SolidWorksAssemblyReader`, `SolidWorksSelectedComponentPropertyReader`, `ProfileStore`, `PropertyDiscoveryService`, and `BomGenerator`.
+- `src\BomPipeLauncher` is the out-of-process automation entry point. It starts SolidWorks through COM, opens a `.SLDASM`, reuses the reader + `BomCore` pipeline, and exports CSV/XLSX output plus an optional debug report.
+- `src\BomPipePdmAddin` is the PDM Professional vault add-in. It contributes the **Generate BOM with BOMPipe** context-menu command for a selected assembly and launches the installed BOMPipe invoker.
+- `src\BomPipePdmVaultInstaller` handles vault registration and removal for the PDM add-in across local vault views.
+- `tests\BomCore.Tests` is the main automated safety net for grouping rules, profile fallback, property discovery, exporters, and debug reports.
 
-Keep the architecture split once the solution is scaffolded:
-
-- `SolidWorksBOMAddin`: COM add-in, UI shell, and all SolidWorks API integration
-- `BomCore`: pure C# domain logic for profiles, grouping, diagnostics, and exporters
-- `BomCore.Tests`: tests for `BomCore` without requiring SolidWorks
-
-Keep SolidWorks API access behind adapters so the core BOM logic stays testable without launching SolidWorks. `BomCore` must not reference `SolidWorks.Interop.sldworks` or `SolidWorks.Interop.swconst`.
-
-Persistent mapping profiles are JSON. The intended profile lookup order is:
-
-1. Project-local profile beside the assembly
-2. User profile in `%AppData%\AFCA\SolidWorksBOMAddin\profiles\`
-3. Company profile in `%ProgramData%\AFCA\SolidWorksBOMAddin\profiles\`
-4. Built-in default profile
-
-The planned implementation order matters: scaffold first, then core models and profile loading, then grouping/property discovery/exporters, then SolidWorks adapters, then minimal UI, diagnostics, and installer work.
+The shared flow is: read the assembly tree in SolidWorks, resolve effective custom properties into `ComponentRecord` instances, load the effective JSON profile, run `BomGenerator`, then export BOM rows plus diagnostics/debug output. In-SolidWorks UI, launcher flows, and PDM flows are expected to reuse that pipeline instead of re-implementing BOM rules in multiple places.
 
 ## Key conventions
 
-- A component is considered a pipe when it has a `PipeLength` property.
-- Pipe cut rows must be grouped by `BOM`, `Pipe Identifier`, `Specification`, and `PipeLength`; pipes with the same BOM but different lengths must stay separate.
-- `NumGaskets` and `NumClamps` are accessory generators, not normal display columns. They produce separate accessory BOM rows using `property value * grouped pipe quantity`.
-- Ignore these properties by default, but keep them discoverable in property exploration: `BlueGasket`, `WhiteGasket`, `BlueFerrule`, `WhiteFerrule`.
-- Prefer explicit diagnostics over crashes. Invalid profiles and bad component reads should return diagnostics and continue with safe fallback behavior where the design brief calls for it.
-- SolidWorks-specific reads should resolve properties in this order: configuration-specific, then file-level, then component-level if available.
-- Suppressed components should be skipped by default and reported diagnostically rather than silently disappearing.
-- Core logic should be implemented and tested before investing in UI polish; the riskiest work is assembly scanning, profile handling, grouping, and export behavior.
-- Avoid coupling BOM generation to a manually opened SolidWorks session; design for both in-SolidWorks use and external launch flows such as Explorer or PDM context-menu entry points.
+- Keep SolidWorks and PDM interop out of `BomCore`. `BomCore` must stay testable without SolidWorks and must not reference `SolidWorks.Interop.sldworks`, `SolidWorks.Interop.swconst`, or PDM interop packages.
+- Effective profile lookup order is: `default.pipebom.json` beside the assembly, then `%AppData%\AFCA\SolidWorksBOMAddin\profiles\`, then `%ProgramData%\AFCA\SolidWorksBOMAddin\profiles\`, then the built-in `profiles\default.pipebom.json`. Invalid or unreadable candidates add diagnostics and fall back to the built-in default profile.
+- SolidWorks property extraction precedence is configuration-specific first, then file-level, then component-level. The extractor keeps the first value found, so earlier scopes win.
+- Assembly traversal must recurse through nested subassemblies. Suppressed components are skipped with info diagnostics; unresolved or unreadable models are skipped with warnings while traversal continues into any children. Virtual parts may not have stable file paths and fall back to component identity when grouped.
+- A component is treated as a pipe when `PipeLength` has a value. Default pipe grouping keeps rows distinct by `BOM`, `Pipe Identifier`, `Specification`, and `PipeLength`; same-BOM pipes with different lengths must not merge.
+- `NumGaskets` and `NumClamps` are accessory generators, not normal display columns. They produce separate rows in **Pipe Accessories** using parsed numeric property value multiplied by component quantity across the grouped pipe components.
+- `BlueGasket`, `WhiteGasket`, `BlueFerrule`, and `WhiteFerrule` remain discoverable during property exploration and default-profile suggestion, but they are ignored by default as BOM columns.
+- Non-pipe grouping uses `BOM` when present; otherwise it falls back to file/configuration identity or virtual-component identity. Current `BomGenerator` output is pipe cuts, pipe accessories, and other components; do not assume a separate fittings classifier already exists just because `KnownBomSections` defines a `Fittings` section constant.
+- Prefer adding or changing BOM rules in `BomCore` and proving them in `tests\BomCore.Tests` before touching the WinForms shell, SolidWorks add-in plumbing, launcher, or PDM integration.

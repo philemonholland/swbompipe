@@ -1,0 +1,3 @@
+C:\Users\gombo\AppData\Local\AFCA\BOMPipe\BomPipePdmAddin\BomPipePdmAddin.dll
+C:\Users\gombo\AppData\Local\AFCA\BOMPipe\BomPipePdmAddin\BomPipePdmAddin.pdb
+C:\Users\gombo\AppData\Local\AFCA\BOMPipe\BomPipePdmAddin\EPDM.Interop.epdm.dll

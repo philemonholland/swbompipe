@@ -13,6 +13,7 @@ public enum PropertyScope
 
 public enum BomRowType
 {
+    SectionItem,
     PipeCut,
     Fitting,
     Accessory,
@@ -143,6 +144,22 @@ public sealed record BomColumnRule
     public string? Unit { get; init; }
 }
 
+public sealed record BomSectionColumnProfile
+{
+    public string Section { get; init; } = KnownBomSections.Other;
+
+    public IReadOnlyList<BomColumnRule> Columns { get; init; } = [];
+}
+
+public sealed record BomSectionRule
+{
+    public string SourceProperty { get; init; } = KnownPropertyNames.PrimaryFamily;
+
+    public string MatchValue { get; init; } = string.Empty;
+
+    public string Section { get; init; } = KnownBomSections.Other;
+}
+
 public sealed record AccessoryRule
 {
     public string SourceProperty { get; init; } = string.Empty;
@@ -162,6 +179,10 @@ public sealed record BomProfile
 
     public IReadOnlyList<BomColumnRule> PipeColumns { get; init; } = [];
 
+    public IReadOnlyList<BomSectionColumnProfile> SectionColumnProfiles { get; init; } = [];
+
+    public IReadOnlyList<BomSectionRule> SectionRules { get; init; } = [];
+
     public IReadOnlyList<AccessoryRule> AccessoryRules { get; init; } = [];
 
     public IReadOnlyList<string> IgnoredProperties { get; init; } = [];
@@ -172,6 +193,63 @@ public sealed record BomProfile
             .FirstOrDefault(rule => string.Equals(rule.ClassName, "Pipe", StringComparison.OrdinalIgnoreCase))
             ?.DetectWhenPropertyExists
             ?? KnownPropertyNames.PipeLength;
+    }
+
+    public IReadOnlyList<BomColumnRule> GetSectionColumns(string section)
+    {
+        var normalizedSection = KnownBomSections.NormalizeConfigurableSection(section);
+        var configuredColumns = SectionColumnProfiles
+            .FirstOrDefault(profile => string.Equals(profile.Section, normalizedSection, StringComparison.OrdinalIgnoreCase))
+            ?.Columns;
+
+        if (configuredColumns is { Count: > 0 })
+        {
+            return configuredColumns;
+        }
+
+        if (string.Equals(normalizedSection, KnownBomSections.Pipes, StringComparison.OrdinalIgnoreCase)
+            && PipeColumns.Count > 0)
+        {
+            return PipeColumns;
+        }
+
+        return KnownBomColumnProfiles.CreateDefaultSectionColumns(normalizedSection);
+    }
+
+    public IReadOnlyList<BomSectionColumnProfile> GetEffectiveSectionColumnProfiles()
+    {
+        var profiles = new List<BomSectionColumnProfile>();
+        foreach (var section in KnownBomSections.ConfigurableSections)
+        {
+            profiles.Add(new BomSectionColumnProfile
+            {
+                Section = section,
+                Columns = GetSectionColumns(section),
+            });
+        }
+
+        return profiles;
+    }
+
+    public IReadOnlyList<BomSectionRule> GetEffectiveSectionRules()
+    {
+        if (SectionRules.Count > 0)
+        {
+            return SectionRules
+                .Where(rule => !string.IsNullOrWhiteSpace(rule.SourceProperty)
+                    && !string.IsNullOrWhiteSpace(rule.MatchValue)
+                    && KnownBomSections.IsConfigurableSection(rule.Section))
+                .ToList();
+        }
+
+        return KnownBomSections.ClassMappedSections
+            .Select(section => new BomSectionRule
+            {
+                SourceProperty = KnownPropertyNames.PrimaryFamily,
+                MatchValue = section,
+                Section = section,
+            })
+            .ToList();
     }
 }
 

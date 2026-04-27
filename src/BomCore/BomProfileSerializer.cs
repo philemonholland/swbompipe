@@ -30,28 +30,44 @@ public static class BomProfileSerializer
     public static IReadOnlyList<BomDiagnostic> Validate(BomProfile profile)
     {
         var diagnostics = new List<BomDiagnostic>();
-        var enabledColumns = profile.PipeColumns
-            .Where(column => column.Enabled)
+        var effectiveProfiles = profile.GetEffectiveSectionColumnProfiles();
+        var enabledColumns = effectiveProfiles
+            .SelectMany(sectionProfile => sectionProfile.Columns.Select(column => new { sectionProfile.Section, Column = column }))
+            .Where(entry => entry.Column.Enabled)
             .ToList();
 
         var duplicateDisplayNames = enabledColumns
-            .Select(column => column.DisplayName)
-            .Concat(profile.AccessoryRules.Select(rule => rule.DisplayName))
+            .GroupBy(entry => entry.Section, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(sectionGroup => sectionGroup
+                .Select(entry => entry.Column.DisplayName)
+                .Where(displayName => !string.IsNullOrWhiteSpace(displayName))
+                .GroupBy(displayName => displayName, StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key))
+            .Concat(profile.GetSectionColumns(KnownBomSections.Pipes)
+                .Where(column => column.Enabled)
+                .Select(column => column.DisplayName)
+                .Concat(profile.AccessoryRules.Select(rule => rule.DisplayName))
+                .Where(displayName => !string.IsNullOrWhiteSpace(displayName))
+                .GroupBy(displayName => displayName, StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key))
             .Where(displayName => !string.IsNullOrWhiteSpace(displayName))
-            .GroupBy(displayName => displayName, StringComparer.OrdinalIgnoreCase)
-            .Where(group => group.Count() > 1);
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         diagnostics.AddRange(
-            duplicateDisplayNames.Select(group => new BomDiagnostic
+            duplicateDisplayNames.Select(displayName => new BomDiagnostic
             {
                 Severity = DiagnosticSeverity.Error,
                 Code = "duplicate-display-name",
-                Message = $"Duplicate display name '{group.Key}' found in the BOM profile.",
+                Message = $"Duplicate display name '{displayName}' found in the BOM profile.",
             }));
 
         foreach (var requiredProperty in KnownPropertyNames.PipeRequiredProperties)
         {
-            if (enabledColumns.All(column => !string.Equals(column.SourceProperty, requiredProperty, StringComparison.OrdinalIgnoreCase)))
+            var pipeColumns = profile.GetSectionColumns(KnownBomSections.Pipes).Where(column => column.Enabled).ToList();
+            if (pipeColumns.All(column => !string.Equals(column.SourceProperty, requiredProperty, StringComparison.OrdinalIgnoreCase)))
             {
                 diagnostics.Add(new BomDiagnostic
                 {
@@ -63,18 +79,23 @@ public static class BomProfileSerializer
             }
         }
 
-        var pipeLengthColumn = enabledColumns.FirstOrDefault(
-            column => string.Equals(column.SourceProperty, KnownPropertyNames.PipeLength, StringComparison.OrdinalIgnoreCase));
-
-        if (pipeLengthColumn is not null && !pipeLengthColumn.GroupBy)
+        foreach (var section in new[] { KnownBomSections.Pipes, KnownBomSections.Tubes, KnownBomSections.Wires })
         {
-            diagnostics.Add(new BomDiagnostic
+            var lengthProperty = KnownBomSections.GetLengthProperty(section);
+            var lengthColumn = profile.GetSectionColumns(section)
+                .Where(column => column.Enabled)
+                .FirstOrDefault(column => string.Equals(column.SourceProperty, lengthProperty, StringComparison.OrdinalIgnoreCase));
+
+            if (lengthColumn is not null && !lengthColumn.GroupBy)
             {
-                Severity = DiagnosticSeverity.Error,
-                Code = "pipe-length-not-grouped",
-                Message = "PipeLength must participate in grouping so equal BOM codes with different lengths stay separate.",
-                PropertyName = KnownPropertyNames.PipeLength,
-            });
+                diagnostics.Add(new BomDiagnostic
+                {
+                    Severity = DiagnosticSeverity.Error,
+                    Code = "length-not-grouped",
+                    Message = $"{lengthProperty} must participate in grouping so equal BOM codes with different lengths stay separate.",
+                    PropertyName = lengthProperty,
+                });
+            }
         }
 
         return diagnostics;

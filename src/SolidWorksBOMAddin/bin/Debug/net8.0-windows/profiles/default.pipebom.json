@@ -1,6 +1,6 @@
 {
   "profileName": "AFCA Pipe BOM",
-  "version": 1,
+  "version": 2,
   "partClassRules": [
     {
       "className": "Pipe",
@@ -36,6 +36,218 @@
       "groupBy": true,
       "order": 4,
       "unit": "in"
+    }
+  ],
+  "sectionColumnProfiles": [
+    {
+      "section": "Pipes",
+      "columns": [
+        {
+          "sourceProperty": "BOM",
+          "displayName": "BOM Code",
+          "enabled": true,
+          "groupBy": true,
+          "order": 1
+        },
+        {
+          "sourceProperty": "Pipe Identifier",
+          "displayName": "Pipe Description",
+          "enabled": true,
+          "groupBy": true,
+          "order": 2
+        },
+        {
+          "sourceProperty": "Specification",
+          "displayName": "Specification",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3
+        },
+        {
+          "sourceProperty": "PipeLength",
+          "displayName": "Cut Length",
+          "enabled": true,
+          "groupBy": true,
+          "order": 4,
+          "unit": "in"
+        }
+      ]
+    },
+    {
+      "section": "Tubes",
+      "columns": [
+        {
+          "sourceProperty": "BOMDesc",
+          "displayName": "BOMDesc",
+          "enabled": true,
+          "groupBy": true,
+          "order": 1
+        },
+        {
+          "sourceProperty": "Description",
+          "displayName": "Description",
+          "enabled": true,
+          "groupBy": true,
+          "order": 2
+        },
+        {
+          "sourceProperty": "TubeLength",
+          "displayName": "Tube Length",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3,
+          "unit": "in"
+        }
+      ]
+    },
+    {
+      "section": "Wires",
+      "columns": [
+        {
+          "sourceProperty": "BOMDesc",
+          "displayName": "BOMDesc",
+          "enabled": true,
+          "groupBy": true,
+          "order": 1
+        },
+        {
+          "sourceProperty": "Description",
+          "displayName": "Description",
+          "enabled": true,
+          "groupBy": true,
+          "order": 2
+        },
+        {
+          "sourceProperty": "WireLength",
+          "displayName": "Wire Length",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3,
+          "unit": "in"
+        }
+      ]
+    },
+    {
+      "section": "Components",
+      "columns": [
+        {
+          "sourceProperty": "BOMDesc",
+          "displayName": "BOMDesc",
+          "enabled": true,
+          "groupBy": true,
+          "order": 1
+        },
+        {
+          "sourceProperty": "Description",
+          "displayName": "Description",
+          "enabled": true,
+          "groupBy": true,
+          "order": 2
+        }
+      ]
+    },
+    {
+      "section": "Connections",
+      "columns": [
+        {
+          "sourceProperty": "BOMDesc",
+          "displayName": "BOMDesc",
+          "enabled": true,
+          "groupBy": true,
+          "order": 1
+        },
+        {
+          "sourceProperty": "Description",
+          "displayName": "Description",
+          "enabled": true,
+          "groupBy": true,
+          "order": 2
+        }
+      ]
+    },
+    {
+      "section": "Fittings",
+      "columns": [
+        {
+          "sourceProperty": "BOMDesc",
+          "displayName": "BOMDesc",
+          "enabled": true,
+          "groupBy": true,
+          "order": 1
+        },
+        {
+          "sourceProperty": "Description",
+          "displayName": "Description",
+          "enabled": true,
+          "groupBy": true,
+          "order": 2
+        }
+      ]
+    },
+    {
+      "section": "Instruments",
+      "columns": [
+        {
+          "sourceProperty": "BOMDesc",
+          "displayName": "BOMDesc",
+          "enabled": true,
+          "groupBy": true,
+          "order": 1
+        },
+        {
+          "sourceProperty": "Description",
+          "displayName": "Description",
+          "enabled": true,
+          "groupBy": true,
+          "order": 2
+        }
+      ]
+    },
+    {
+      "section": "Systems",
+      "columns": [
+        {
+          "sourceProperty": "BOMDesc",
+          "displayName": "BOMDesc",
+          "enabled": true,
+          "groupBy": true,
+          "order": 1
+        },
+        {
+          "sourceProperty": "Description",
+          "displayName": "Description",
+          "enabled": true,
+          "groupBy": true,
+          "order": 2
+        }
+      ]
+    }
+  ],
+  "sectionRules": [
+    {
+      "sourceProperty": "Class",
+      "matchValue": "Components",
+      "section": "Components"
+    },
+    {
+      "sourceProperty": "Class",
+      "matchValue": "Connections",
+      "section": "Connections"
+    },
+    {
+      "sourceProperty": "Class",
+      "matchValue": "Fittings",
+      "section": "Fittings"
+    },
+    {
+      "sourceProperty": "Class",
+      "matchValue": "Instruments",
+      "section": "Instruments"
+    },
+    {
+      "sourceProperty": "Class",
+      "matchValue": "Systems",
+      "section": "Systems"
     }
   ],
   "accessoryRules": [

@@ -37,6 +37,8 @@ Future integration validation should happen on a workstation with SolidWorks ins
 - scanning an entire assembly recursively
 - handling suppressed, lightweight, unresolved, virtual, and nested components without crashing
 - producing grouped pipe and accessory rows that match the planning rules
+- registering the SolidWorks add-in so it appears in **Tools > Add-Ins**
+- exposing the BOMPipe command from the PDM Professional assembly right-click menu
 
 ## Real assembly validation target
 
@@ -52,6 +54,8 @@ Planned checks against that assembly:
 4. confirm accessory quantities are multiplied by grouped pipe quantity
 5. export CSV/XLSX and inspect the resulting sections
 6. invoke the launcher against the same assembly and confirm it can export without a manually opened SolidWorks session
+7. install BOMPipe and confirm it appears in the SolidWorks Add-Ins dialog
+8. confirm the PDM Professional right-click menu exposes the BOMPipe command for the same assembly
 
 ## Environment note
 

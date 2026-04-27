@@ -1,0 +1,12 @@
+C:\codebase\bompipe\src\BomPipePdmAddin\bin\Debug\net48\BomPipePdmAddin.dll
+C:\codebase\bompipe\src\BomPipePdmAddin\bin\Debug\net48\BomPipePdmAddin.pdb
+C:\codebase\bompipe\src\BomPipePdmAddin\bin\Debug\net48\EPDM.Interop.epdm.dll
+C:\codebase\bompipe\src\BomPipePdmAddin\obj\Debug\net48\BomPipePdmAddin.csproj.AssemblyReference.cache
+C:\codebase\bompipe\src\BomPipePdmAddin\obj\Debug\net48\BomPipePdmAddin.GeneratedMSBuildEditorConfig.editorconfig
+C:\codebase\bompipe\src\BomPipePdmAddin\obj\Debug\net48\BomPipePdmAddin.AssemblyInfoInputs.cache
+C:\codebase\bompipe\src\BomPipePdmAddin\obj\Debug\net48\BomPipePdmAddin.AssemblyInfo.cs
+C:\codebase\bompipe\src\BomPipePdmAddin\obj\Debug\net48\BomPipePdmAddin.csproj.CoreCompileInputs.cache
+C:\codebase\bompipe\src\BomPipePdmAddin\obj\Debug\net48\BomPipePdmAddin.sourcelink.json
+C:\codebase\bompipe\src\BomPipePdmAddin\obj\Debug\net48\BomPipeP.0AFA79CF.Up2Date
+C:\codebase\bompipe\src\BomPipePdmAddin\obj\Debug\net48\BomPipePdmAddin.dll
+C:\codebase\bompipe\src\BomPipePdmAddin\obj\Debug\net48\BomPipePdmAddin.pdb

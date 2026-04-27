@@ -9,9 +9,11 @@ This repository is the scaffold for **AFCA Piping BOM Generator**, a SolidWorks 
 - `SolidWorksBOMAddin.sln` - solution entry point
 - `src\BomCore` - pure .NET class library for profiles, grouping, exporters, and diagnostics
 - `src\SolidWorksBOMAddin` - SolidWorks COM add-in, adapters, and UI/orchestration
-- `src\BomPipeLauncher` - external launcher for Explorer/PDM-style background automation
+- `src\BomPipeLauncher` - external launcher for background BOM automation
+- `src\BomPipePdmAddin` - PDM Professional add-in that contributes the vault context-menu command
+- `src\BomPipePdmVaultInstaller` - vault registration utility for installing and removing the PDM add-in
 - `tests\BomCore.Tests` - unit tests for `BomCore`
-- `scripts\register-addin.ps1` / `scripts\unregister-addin.ps1` - COM registration helpers
+- `scripts\register-addin.ps1` / `scripts\unregister-addin.ps1` - SolidWorks add-in registration helpers
 - `profiles\default.pipebom.json` - built-in default profile scaffold
 - `docs\` - architecture, rules, and testing references
 
@@ -37,18 +39,24 @@ This repository is the scaffold for **AFCA Piping BOM Generator**, a SolidWorks 
 - translating SolidWorks objects into `BomCore` records
 - UI and launch/orchestration concerns
 
-This boundary also covers non-embedded entry points. The product is expected to work not only from an in-session add-in command, but also from Windows Explorer or PDM launch flows.
+This boundary also covers non-embedded entry points. The product is expected to work not only from an in-session add-in command, but also from Windows Explorer and from a dedicated PDM Professional add-in/menu command.
 
 ### `BomPipeLauncher`
 
 `BomPipeLauncher` is the background automation entry point for out-of-process launch flows. It is responsible for:
 
-- starting SolidWorks through COM when launched from Explorer or PDM
+- starting SolidWorks through COM when launched from Explorer or the PDM add-in
 - opening an assembly in the background
 - reusing the SolidWorks adapter layer to read components
 - loading the effective BOM profile and exporting CSV/XLSX output
 
 It should stay thin and delegate BOM rules to `BomCore` and SolidWorks object translation to the adapter project.
+
+### `BomPipePdmAddin` and `BomPipePdmVaultInstaller`
+
+`BomPipePdmAddin` is the vault-side integration boundary. It contributes the **Generate BOM with BOMPipe** command to the PDM Professional file context menu and launches the installed BOMPipe invoker for the selected assembly.
+
+`BomPipePdmVaultInstaller` handles vault registration and removal for that add-in using the PDM add-in manager API. This keeps vault deployment concerns out of the pure launcher and SolidWorks add-in projects.
 
 ### `BomCore.Tests`
 

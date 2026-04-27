@@ -13,10 +13,13 @@ public sealed class PropertyDiscoveryServiceTests
 
         var profile = service.SuggestDefaultProfile(components);
 
-        Assert.Contains(profile.PipeColumns, column => column.DisplayName == "BOM Code");
-        Assert.Contains(profile.PipeColumns, column => column.DisplayName == "Pipe Description");
-        Assert.Contains(profile.PipeColumns, column => column.DisplayName == "Specification");
-        Assert.Contains(profile.PipeColumns, column => column.DisplayName == "Cut Length");
+        var pipeColumns = profile.GetSectionColumns(KnownBomSections.Pipes);
+        Assert.Contains(pipeColumns, column => column.DisplayName == "BOM Code");
+        Assert.Contains(pipeColumns, column => column.DisplayName == "Pipe Description");
+        Assert.Contains(pipeColumns, column => column.DisplayName == "Specification");
+        Assert.Contains(pipeColumns, column => column.DisplayName == "Cut Length");
+        Assert.Contains(profile.SectionColumnProfiles, sectionProfile => sectionProfile.Section == KnownBomSections.Tubes);
+        Assert.Contains(profile.SectionRules, rule => rule.SourceProperty == KnownPropertyNames.PrimaryFamily && rule.Section == KnownBomSections.Fittings);
         Assert.Contains(profile.AccessoryRules, rule => rule.DisplayName == "Gaskets");
         Assert.Contains(profile.AccessoryRules, rule => rule.DisplayName == "Clamps");
     }

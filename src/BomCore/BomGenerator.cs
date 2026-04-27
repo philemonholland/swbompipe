@@ -7,173 +7,54 @@ public sealed class BomGenerator
         var componentList = components.ToList();
         var diagnostics = new List<BomDiagnostic>(BomProfileSerializer.Validate(profile));
         var rows = new List<BomRow>();
-        var pipeDetectorProperty = profile.GetPipeDetectionProperty();
-        var enabledPipeColumns = profile.PipeColumns
-            .Where(column => column.Enabled)
-            .OrderBy(column => column.Order)
-            .ToList();
         var ignoredProperties = new HashSet<string>(profile.IgnoredProperties, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var component in componentList)
-        {
-            if (component.IsSuppressed)
-            {
-                diagnostics.Add(new BomDiagnostic
-                {
-                    Severity = DiagnosticSeverity.Info,
-                    Code = "component-suppressed",
-                    Message = $"Component '{component.ComponentName}' was skipped because it is suppressed.",
-                    ComponentId = component.ComponentId,
-                });
-                continue;
-            }
-
-            if (LooksLikePipeCandidate(component, pipeDetectorProperty) && component.GetPropertyValue(pipeDetectorProperty) is null)
-            {
-                diagnostics.Add(new BomDiagnostic
-                {
-                    Severity = DiagnosticSeverity.Warning,
-                    Code = "missing-pipe-length",
-                    Message = $"Component '{component.ComponentName}' appears to be a pipe candidate but is missing PipeLength.",
-                    ComponentId = component.ComponentId,
-                    PropertyName = pipeDetectorProperty,
-                });
-            }
-
-            if (IsPipe(component, pipeDetectorProperty))
-            {
-                AddMissingPipeFieldDiagnostics(component, diagnostics);
-            }
-            else if (string.IsNullOrWhiteSpace(component.GetPropertyValue(KnownPropertyNames.Bom)))
-            {
-                diagnostics.Add(new BomDiagnostic
-                {
-                    Severity = DiagnosticSeverity.Info,
-                    Code = "missing-bom",
-                    Message = $"Component '{component.ComponentName}' does not define BOM.",
-                    ComponentId = component.ComponentId,
-                    PropertyName = KnownPropertyNames.Bom,
-                });
-            }
-        }
-
         var activeComponents = componentList.Where(component => !component.IsSuppressed).ToList();
 
-        var pipeGroups = activeComponents
-            .Where(component => IsPipe(component, pipeDetectorProperty))
-            .GroupBy(component => BuildPipeGroupKey(component, enabledPipeColumns));
-
-        foreach (var group in pipeGroups)
+        foreach (var component in componentList.Where(component => component.IsSuppressed))
         {
-            var groupedComponents = group.ToList();
-            var firstComponent = groupedComponents[0];
-            var quantity = groupedComponents.Sum(component => component.Quantity);
-            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var column in enabledPipeColumns)
+            diagnostics.Add(new BomDiagnostic
             {
-                if (ignoredProperties.Contains(column.SourceProperty))
-                {
-                    continue;
-                }
-
-                values[column.DisplayName] = firstComponent.GetPropertyValue(column.SourceProperty) ?? string.Empty;
-            }
-
-            rows.Add(new BomRow
-            {
-                Section = KnownBomSections.PipeCutList,
-                RowType = BomRowType.PipeCut,
-                Values = values,
-                Quantity = quantity,
+                Severity = DiagnosticSeverity.Info,
+                Code = "component-suppressed",
+                Message = $"Component '{component.ComponentName}' was skipped because it is suppressed.",
+                ComponentId = component.ComponentId,
             });
+        }
 
-            foreach (var accessoryRule in profile.AccessoryRules)
+        var classifiedComponents = activeComponents
+            .Select(component => new ClassifiedComponent(
+                component,
+                ClassifyComponent(component, profile.GetEffectiveSectionRules(), diagnostics)))
+            .ToList();
+
+        foreach (var sectionGroup in classifiedComponents.GroupBy(item => item.Section, StringComparer.OrdinalIgnoreCase))
+        {
+            var section = KnownBomSections.NormalizeConfigurableSection(sectionGroup.Key);
+            var columns = profile.GetSectionColumns(section)
+                .Where(column => column.Enabled && !ignoredProperties.Contains(column.SourceProperty))
+                .OrderBy(column => column.Order)
+                .ToList();
+
+            foreach (var group in sectionGroup.GroupBy(item => BuildGroupKey(item.Component, columns)))
             {
-                decimal accessoryQuantity = 0m;
-
-                foreach (var component in groupedComponents)
-                {
-                    var rawValue = component.GetPropertyValue(accessoryRule.SourceProperty);
-                    if (string.IsNullOrWhiteSpace(rawValue))
-                    {
-                        continue;
-                    }
-
-                    if (!NumericParsing.TryParseDecimal(rawValue, out var numericValue))
-                    {
-                        diagnostics.Add(new BomDiagnostic
-                        {
-                            Severity = DiagnosticSeverity.Warning,
-                            Code = "invalid-accessory-quantity",
-                            Message = $"Property '{accessoryRule.SourceProperty}' on component '{component.ComponentName}' could not be parsed as a number.",
-                            ComponentId = component.ComponentId,
-                            PropertyName = accessoryRule.SourceProperty,
-                        });
-                        continue;
-                    }
-
-                    accessoryQuantity += numericValue * component.Quantity;
-                }
-
-                if (accessoryQuantity == 0m)
-                {
-                    continue;
-                }
+                var groupedComponents = group.Select(item => item.Component).ToList();
+                var quantity = groupedComponents.Sum(component => component.Quantity);
+                var firstComponent = groupedComponents[0];
+                var values = BuildValues(firstComponent, columns, diagnostics);
 
                 rows.Add(new BomRow
                 {
-                    Section = string.IsNullOrWhiteSpace(accessoryRule.BomSection) ? KnownBomSections.PipeAccessories : accessoryRule.BomSection,
-                    RowType = BomRowType.Accessory,
-                    Values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        ["Description"] = accessoryRule.DisplayName,
-                    },
-                    Quantity = accessoryQuantity,
+                    Section = section,
+                    RowType = GetRowType(section),
+                    Values = values,
+                    Quantity = quantity,
                 });
+
+                if (string.Equals(section, KnownBomSections.Pipes, StringComparison.OrdinalIgnoreCase))
+                {
+                    AddAccessoryRows(groupedComponents, profile.AccessoryRules, rows, diagnostics);
+                }
             }
-        }
-
-        var nonPipeGroups = activeComponents
-            .Where(component => !IsPipe(component, pipeDetectorProperty))
-            .GroupBy(BuildNonPipeGroupKey);
-
-        foreach (var group in nonPipeGroups)
-        {
-            var groupedComponents = group.ToList();
-            var firstComponent = groupedComponents[0];
-            var quantity = groupedComponents.Sum(component => component.Quantity);
-            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var bomValue = firstComponent.GetPropertyValue(KnownPropertyNames.Bom);
-
-            if (!string.IsNullOrWhiteSpace(bomValue))
-            {
-                values["BOM"] = bomValue;
-            }
-
-            values["Component"] = firstComponent.ComponentName;
-
-            if (firstComponent.IsVirtual)
-            {
-                values["Component Type"] = "Virtual";
-            }
-            else if (!string.IsNullOrWhiteSpace(firstComponent.FilePath))
-            {
-                values["File Path"] = firstComponent.FilePath!;
-            }
-
-            if (!string.IsNullOrWhiteSpace(firstComponent.ConfigurationName))
-            {
-                values["Configuration"] = firstComponent.ConfigurationName;
-            }
-
-            rows.Add(new BomRow
-            {
-                Section = KnownBomSections.OtherComponents,
-                RowType = BomRowType.Other,
-                Values = values,
-                Quantity = quantity,
-            });
         }
 
         return new BomResult
@@ -181,6 +62,141 @@ public sealed class BomGenerator
             Rows = OrderRows(rows),
             Diagnostics = diagnostics,
         };
+    }
+
+    private static string ClassifyComponent(
+        ComponentRecord component,
+        IReadOnlyList<BomSectionRule> sectionRules,
+        ICollection<BomDiagnostic> diagnostics)
+    {
+        var matchedRule = sectionRules.FirstOrDefault(rule =>
+            string.Equals(component.GetPropertyValue(rule.SourceProperty), rule.MatchValue, StringComparison.OrdinalIgnoreCase));
+        if (matchedRule is not null)
+        {
+            return KnownBomSections.NormalizeConfigurableSection(matchedRule.Section);
+        }
+
+        var familyValue = component.GetPropertyValue(KnownPropertyNames.PrimaryFamily);
+        if (string.IsNullOrWhiteSpace(familyValue))
+        {
+            return KnownBomSections.Other;
+        }
+
+        var aliasSection = KnownBomSections.ConfigurableSections.FirstOrDefault(section =>
+            string.Equals(familyValue, section, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(familyValue, ToSingularAlias(section), StringComparison.OrdinalIgnoreCase));
+
+        if (aliasSection is not null)
+        {
+            return aliasSection;
+        }
+
+        return KnownBomSections.Other;
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildValues(
+        ComponentRecord component,
+        IEnumerable<BomColumnRule> columns,
+        ICollection<BomDiagnostic> diagnostics)
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var column in columns)
+        {
+            if (string.IsNullOrWhiteSpace(column.SourceProperty) || string.IsNullOrWhiteSpace(column.DisplayName))
+            {
+                continue;
+            }
+
+            var value = component.GetPropertyValue(column.SourceProperty);
+            if (value is null)
+            {
+                diagnostics.Add(new BomDiagnostic
+                {
+                    Severity = DiagnosticSeverity.Warning,
+                    Code = "missing-configured-property",
+                    Message = $"Configured property '{column.SourceProperty}' is missing on component '{component.ComponentName}'.",
+                    ComponentId = component.ComponentId,
+                    PropertyName = column.SourceProperty,
+                });
+            }
+
+            values[column.DisplayName] = value ?? string.Empty;
+        }
+
+        return values;
+    }
+
+    private static string BuildGroupKey(ComponentRecord component, IEnumerable<BomColumnRule> columns)
+    {
+        var groupByColumns = columns.Where(column => column.GroupBy).ToList();
+        if (groupByColumns.Count == 0)
+        {
+            groupByColumns = columns.ToList();
+        }
+
+        return string.Join(
+            "\u001F",
+            groupByColumns.Select(column => component.GetPropertyValue(column.SourceProperty) ?? string.Empty));
+    }
+
+    private static string ToSingularAlias(string section)
+    {
+        return section.EndsWith("s", StringComparison.OrdinalIgnoreCase)
+            ? section[..^1]
+            : section;
+    }
+
+    private static void AddAccessoryRows(
+        IReadOnlyList<ComponentRecord> groupedComponents,
+        IEnumerable<AccessoryRule> accessoryRules,
+        ICollection<BomRow> rows,
+        ICollection<BomDiagnostic> diagnostics)
+    {
+        foreach (var accessoryRule in accessoryRules)
+        {
+            decimal accessoryQuantity = 0m;
+
+            foreach (var component in groupedComponents)
+            {
+                var rawValue = component.GetPropertyValue(accessoryRule.SourceProperty);
+                if (string.IsNullOrWhiteSpace(rawValue))
+                {
+                    continue;
+                }
+
+                if (!NumericParsing.TryParseDecimal(rawValue, out var numericValue))
+                {
+                    diagnostics.Add(new BomDiagnostic
+                    {
+                        Severity = DiagnosticSeverity.Warning,
+                        Code = "invalid-accessory-quantity",
+                        Message = $"Property '{accessoryRule.SourceProperty}' on component '{component.ComponentName}' could not be parsed as a number.",
+                        ComponentId = component.ComponentId,
+                        PropertyName = accessoryRule.SourceProperty,
+                    });
+                    continue;
+                }
+
+                accessoryQuantity += numericValue * component.Quantity;
+            }
+
+            if (accessoryQuantity == 0m)
+            {
+                continue;
+            }
+
+            rows.Add(new BomRow
+            {
+                Section = KnownBomSections.NormalizeAccessorySection(accessoryRule.BomSection),
+                RowType = BomRowType.Accessory,
+                Values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Description"] = accessoryRule.DisplayName,
+                },
+                Quantity = accessoryQuantity,
+            });
+        }
     }
 
     private static IReadOnlyList<BomRow> OrderRows(IEnumerable<BomRow> rows)
@@ -196,63 +212,20 @@ public sealed class BomGenerator
             .ToList();
     }
 
-    private static bool IsPipe(ComponentRecord component, string pipeDetectorProperty)
+    private static BomRowType GetRowType(string section)
     {
-        return !string.IsNullOrWhiteSpace(component.GetPropertyValue(pipeDetectorProperty));
-    }
-
-    private static bool LooksLikePipeCandidate(ComponentRecord component, string pipeDetectorProperty)
-    {
-        if (component.GetPropertyValue(pipeDetectorProperty) is not null)
+        if (string.Equals(section, KnownBomSections.Pipes, StringComparison.OrdinalIgnoreCase))
         {
-            return true;
+            return BomRowType.PipeCut;
         }
 
-        return KnownPropertyNames.PipeCandidateProperties.Any(propertyName => component.GetPropertyValue(propertyName) is not null);
-    }
-
-    private static string BuildPipeGroupKey(ComponentRecord component, IEnumerable<BomColumnRule> enabledPipeColumns)
-    {
-        return string.Join(
-            "\u001F",
-            enabledPipeColumns
-                .Where(column => column.GroupBy)
-                .Select(column => component.GetPropertyValue(column.SourceProperty) ?? string.Empty));
-    }
-
-    private static string BuildNonPipeGroupKey(ComponentRecord component)
-    {
-        var bomValue = component.GetPropertyValue(KnownPropertyNames.Bom);
-        if (!string.IsNullOrWhiteSpace(bomValue))
+        if (string.Equals(section, KnownBomSections.Fittings, StringComparison.OrdinalIgnoreCase))
         {
-            return $"bom:{bomValue}";
+            return BomRowType.Fitting;
         }
 
-        return component.GetIdentityFallback();
+        return BomRowType.SectionItem;
     }
 
-    private static void AddMissingPipeFieldDiagnostics(ComponentRecord component, ICollection<BomDiagnostic> diagnostics)
-    {
-        foreach (var propertyName in new[]
-                 {
-                     KnownPropertyNames.Bom,
-                     KnownPropertyNames.PipeIdentifier,
-                     KnownPropertyNames.Specification,
-                 })
-        {
-            if (component.GetPropertyValue(propertyName) is not null)
-            {
-                continue;
-            }
-
-            diagnostics.Add(new BomDiagnostic
-            {
-                Severity = DiagnosticSeverity.Warning,
-                Code = $"missing-{propertyName.ToLowerInvariant().Replace(' ', '-')}",
-                Message = $"Pipe component '{component.ComponentName}' is missing '{propertyName}'.",
-                ComponentId = component.ComponentId,
-                PropertyName = propertyName,
-            });
-        }
-    }
+    private sealed record ClassifiedComponent(ComponentRecord Component, string Section);
 }

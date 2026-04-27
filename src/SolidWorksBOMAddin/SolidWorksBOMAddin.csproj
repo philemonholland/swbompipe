@@ -24,5 +24,4 @@
     <EnableComHosting>true</EnableComHosting>
     <AssemblyName>AFCA.PipingBom.Generator</AssemblyName>
   </PropertyGroup>
-
 </Project>

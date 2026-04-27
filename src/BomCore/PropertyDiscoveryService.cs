@@ -19,7 +19,7 @@ public sealed class PropertyDiscoveryService
         return new PropertyDiscoveryResult
         {
             DiscoveredProperties = propertyNames,
-            SuggestedColumns = suggestedProfile.PipeColumns,
+            SuggestedColumns = suggestedProfile.GetSectionColumns(KnownBomSections.Pipes),
             IgnoredProperties = ignoredProperties,
             Diagnostics = [],
         };
@@ -32,23 +32,23 @@ public sealed class PropertyDiscoveryService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var pipeColumns = new List<BomColumnRule>();
-        var order = 1;
+        var sectionProfiles = new List<BomSectionColumnProfile>();
 
-        AddSuggestedColumn(propertyNames, pipeColumns, KnownPropertyNames.Bom, "BOM Code", groupBy: true, ref order);
-        AddSuggestedColumn(propertyNames, pipeColumns, KnownPropertyNames.PipeIdentifier, "Pipe Description", groupBy: true, ref order);
-        AddSuggestedColumn(propertyNames, pipeColumns, KnownPropertyNames.Specification, "Specification", groupBy: true, ref order);
-
-        if (propertyNames.Contains(KnownPropertyNames.PipeLength))
+        foreach (var section in KnownBomSections.ConfigurableSections)
         {
-            pipeColumns.Add(new BomColumnRule
+            var columns = KnownBomColumnProfiles.CreateDefaultSectionColumns(section)
+                .Where(column => propertyNames.Contains(column.SourceProperty))
+                .ToList();
+
+            if (columns.Count == 0 && !KnownBomSections.IsPipeLikeSection(section))
             {
-                SourceProperty = KnownPropertyNames.PipeLength,
-                DisplayName = "Cut Length",
-                Enabled = true,
-                GroupBy = true,
-                Order = order++,
-                Unit = "in",
+                columns = KnownBomColumnProfiles.CreateDefaultSectionColumns(section).ToList();
+            }
+
+            sectionProfiles.Add(new BomSectionColumnProfile
+            {
+                Section = section,
+                Columns = columns.Count == 0 ? KnownBomColumnProfiles.CreateDefaultSectionColumns(section) : columns,
             });
         }
 
@@ -56,49 +56,35 @@ public sealed class PropertyDiscoveryService
         AddAccessoryRule(propertyNames, accessoryRules, KnownPropertyNames.NumGaskets, "Gaskets");
         AddAccessoryRule(propertyNames, accessoryRules, KnownPropertyNames.NumClamps, "Clamps");
 
-        var partClassRules = propertyNames.Contains(KnownPropertyNames.PipeLength)
-            ? new List<PartClassRule>
+        var sectionRules = KnownBomSections.ClassMappedSections
+            .Select(section => new BomSectionRule
             {
-                new()
-                {
-                    ClassName = "Pipe",
-                    DetectWhenPropertyExists = KnownPropertyNames.PipeLength,
-                },
-            }
-            : [];
+                SourceProperty = KnownPropertyNames.PrimaryFamily,
+                MatchValue = section,
+                Section = section,
+            })
+            .ToList();
 
         return new BomProfile
         {
             ProfileName = "AFCA Pipe BOM",
-            Version = 1,
-            PartClassRules = partClassRules,
-            PipeColumns = pipeColumns,
+            Version = 2,
+            PartClassRules =
+            [
+                new PartClassRule
+                {
+                    ClassName = "Pipe",
+                    DetectWhenPropertyExists = KnownPropertyNames.PipeLength,
+                },
+            ],
+            PipeColumns = sectionProfiles
+                .First(profile => string.Equals(profile.Section, KnownBomSections.Pipes, StringComparison.OrdinalIgnoreCase))
+                .Columns,
+            SectionColumnProfiles = sectionProfiles,
+            SectionRules = sectionRules,
             AccessoryRules = accessoryRules,
             IgnoredProperties = KnownPropertyNames.DefaultIgnoredProperties.ToList(),
         };
-    }
-
-    private static void AddSuggestedColumn(
-        IReadOnlySet<string> propertyNames,
-        ICollection<BomColumnRule> columns,
-        string sourceProperty,
-        string displayName,
-        bool groupBy,
-        ref int order)
-    {
-        if (!propertyNames.Contains(sourceProperty))
-        {
-            return;
-        }
-
-        columns.Add(new BomColumnRule
-        {
-            SourceProperty = sourceProperty,
-            DisplayName = displayName,
-            Enabled = true,
-            GroupBy = groupBy,
-            Order = order++,
-        });
     }
 
     private static void AddAccessoryRule(
