@@ -11,3 +11,6 @@ C:\codebase\bompipe\src\BomCore\obj\Debug\net8.0\BomCore.dll
 C:\codebase\bompipe\src\BomCore\obj\Debug\net8.0\refint\BomCore.dll
 C:\codebase\bompipe\src\BomCore\obj\Debug\net8.0\BomCore.pdb
 C:\codebase\bompipe\src\BomCore\obj\Debug\net8.0\ref\BomCore.dll
+C:\Users\gombo\AppData\Local\Temp\bompipe-live-build\BomCore.deps.json
+C:\Users\gombo\AppData\Local\Temp\bompipe-live-build\BomCore.dll
+C:\Users\gombo\AppData\Local\Temp\bompipe-live-build\BomCore.pdb

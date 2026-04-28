@@ -216,10 +216,25 @@ public sealed record BomProfile
         return KnownBomColumnProfiles.CreateDefaultSectionColumns(normalizedSection);
     }
 
-    public IReadOnlyList<BomSectionColumnProfile> GetEffectiveSectionColumnProfiles()
+    public IReadOnlyList<string> GetConfiguredConfigurableSections()
+    {
+        return KnownBomSections.BuildConfigurableSections(
+            SectionColumnProfiles.Select(profile => profile.Section)
+                .Concat(SectionRules.Select(rule => rule.Section))
+                .Concat([KnownBomSections.Other]));
+    }
+
+    public IReadOnlyList<string> GetEffectiveConfigurableSections(IEnumerable<string>? discoveredSections = null)
+    {
+        return KnownBomSections.BuildConfigurableSections(
+            GetConfiguredConfigurableSections()
+                .Concat(discoveredSections ?? []));
+    }
+
+    public IReadOnlyList<BomSectionColumnProfile> GetEffectiveSectionColumnProfiles(IEnumerable<string>? discoveredSections = null)
     {
         var profiles = new List<BomSectionColumnProfile>();
-        foreach (var section in KnownBomSections.ConfigurableSections)
+        foreach (var section in GetEffectiveConfigurableSections(discoveredSections))
         {
             profiles.Add(new BomSectionColumnProfile
             {
@@ -288,6 +303,8 @@ public sealed record BomResult
 public sealed record PropertyDiscoveryResult
 {
     public IReadOnlyList<string> DiscoveredProperties { get; init; } = [];
+
+    public IReadOnlyList<string> DiscoveredSections { get; init; } = [];
 
     public IReadOnlyList<BomColumnRule> SuggestedColumns { get; init; } = [];
 

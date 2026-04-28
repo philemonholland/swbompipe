@@ -59,7 +59,7 @@ public sealed class BomGenerator
 
         return new BomResult
         {
-            Rows = OrderRows(rows),
+            Rows = OrderRows(MergeDuplicateAccessoryRows(rows)),
             Diagnostics = diagnostics,
         };
     }
@@ -82,16 +82,18 @@ public sealed class BomGenerator
             return KnownBomSections.Other;
         }
 
-        var aliasSection = KnownBomSections.ConfigurableSections.FirstOrDefault(section =>
-            string.Equals(familyValue, section, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(familyValue, ToSingularAlias(section), StringComparison.OrdinalIgnoreCase));
+        var aliasSection = KnownBomSections.DisplayOrder
+            .Concat(KnownBomSections.PreferredDynamicSections)
+            .FirstOrDefault(section =>
+                string.Equals(familyValue, section, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(familyValue, ToSingularAlias(section), StringComparison.OrdinalIgnoreCase));
 
         if (aliasSection is not null)
         {
             return aliasSection;
         }
 
-        return KnownBomSections.Other;
+        return KnownBomSections.NormalizeConfigurableSection(familyValue);
     }
 
     private static IReadOnlyDictionary<string, string> BuildValues(
@@ -201,7 +203,8 @@ public sealed class BomGenerator
 
     private static IReadOnlyList<BomRow> OrderRows(IEnumerable<BomRow> rows)
     {
-        var sectionOrder = KnownBomSections.DisplayOrder
+        var orderedSections = KnownBomSections.OrderSections(rows.Select(row => row.Section));
+        var sectionOrder = orderedSections
             .Select((section, index) => new { section, index })
             .ToDictionary(entry => entry.section, entry => entry.index, StringComparer.OrdinalIgnoreCase);
 
@@ -210,6 +213,41 @@ public sealed class BomGenerator
             .ThenBy(row => row.RowType)
             .ThenBy(row => string.Join("|", row.Values.Values))
             .ToList();
+    }
+
+    private static IReadOnlyList<BomRow> MergeDuplicateAccessoryRows(IEnumerable<BomRow> rows)
+    {
+        var rowList = rows.ToList();
+        var mergedRows = rowList
+            .Where(row => row.RowType != BomRowType.Accessory)
+            .ToList();
+
+        foreach (var group in rowList
+                     .Where(row => row.RowType == BomRowType.Accessory)
+                     .GroupBy(BuildAccessoryMergeKey, StringComparer.Ordinal))
+        {
+            var firstRow = group.First();
+            mergedRows.Add(new BomRow
+            {
+                Section = firstRow.Section,
+                RowType = firstRow.RowType,
+                Values = new Dictionary<string, string>(firstRow.Values, StringComparer.OrdinalIgnoreCase),
+                Quantity = group.Sum(row => row.Quantity),
+            });
+        }
+
+        return mergedRows;
+    }
+
+    private static string BuildAccessoryMergeKey(BomRow row)
+    {
+        var valueKey = string.Join(
+            "\u001F",
+            row.Values
+                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(pair => $"{pair.Key}={pair.Value}"));
+
+        return $"{row.Section}\u001E{valueKey}";
     }
 
     private static BomRowType GetRowType(string section)

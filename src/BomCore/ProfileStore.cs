@@ -29,14 +29,31 @@ public sealed class ProfileStore
         ArgumentException.ThrowIfNullOrWhiteSpace(assemblyPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.DefaultProfilePath);
 
-        var diagnostics = new List<BomDiagnostic>();
         var assemblyDirectory = Path.GetDirectoryName(assemblyPath) ?? string.Empty;
-        var candidatePaths = new[]
-        {
-            Path.Combine(assemblyDirectory, options.DefaultProfileFileName),
-            TryBuildCandidatePath(options.UserProfileDirectory, options.DefaultProfileFileName),
-            TryBuildCandidatePath(options.CompanyProfileDirectory, options.DefaultProfileFileName),
-        };
+        return LoadFromCandidatePaths(
+            [
+                Path.Combine(assemblyDirectory, options.DefaultProfileFileName),
+                TryBuildCandidatePath(options.UserProfileDirectory, options.DefaultProfileFileName),
+                TryBuildCandidatePath(options.CompanyProfileDirectory, options.DefaultProfileFileName),
+            ],
+            options.DefaultProfilePath);
+    }
+
+    public ProfileLoadResult LoadDefaultProfile(ProfileStoreOptions options)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.DefaultProfilePath);
+
+        return LoadFromCandidatePaths(
+            [
+                TryBuildCandidatePath(options.UserProfileDirectory, options.DefaultProfileFileName),
+                TryBuildCandidatePath(options.CompanyProfileDirectory, options.DefaultProfileFileName),
+            ],
+            options.DefaultProfilePath);
+    }
+
+    private ProfileLoadResult LoadFromCandidatePaths(IEnumerable<string?> candidatePaths, string defaultProfilePath)
+    {
+        var diagnostics = new List<BomDiagnostic>();
 
         foreach (var candidatePath in candidatePaths.Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path)))
         {
@@ -54,7 +71,7 @@ public sealed class ProfileStore
                     });
 
                     diagnostics.AddRange(profileDiagnostics);
-                    return LoadDefaultProfile(options.DefaultProfilePath, diagnostics);
+                    return LoadBuiltInDefaultProfile(defaultProfilePath, diagnostics);
                 }
 
                 diagnostics.AddRange(profileDiagnostics);
@@ -74,14 +91,14 @@ public sealed class ProfileStore
                     Message = $"Could not load profile '{candidatePath}'. Falling back to the built-in default profile.",
                 });
 
-                return LoadDefaultProfile(options.DefaultProfilePath, diagnostics);
+                return LoadBuiltInDefaultProfile(defaultProfilePath, diagnostics);
             }
         }
 
-        return LoadDefaultProfile(options.DefaultProfilePath, diagnostics);
+        return LoadBuiltInDefaultProfile(defaultProfilePath, diagnostics);
     }
 
-    private static ProfileLoadResult LoadDefaultProfile(string defaultProfilePath, IReadOnlyList<BomDiagnostic> existingDiagnostics)
+    private static ProfileLoadResult LoadBuiltInDefaultProfile(string defaultProfilePath, IReadOnlyList<BomDiagnostic> existingDiagnostics)
     {
         var diagnostics = existingDiagnostics.ToList();
         var profile = BomProfileSerializer.Deserialize(File.ReadAllText(defaultProfilePath));

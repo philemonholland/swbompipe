@@ -57,6 +57,27 @@ public sealed class BomGeneratorTests
     }
 
     [Fact]
+    public void Generate_MergesIdenticalAccessoryRowsAcrossSeparatePipeGroups()
+    {
+        var generator = new BomGenerator();
+        var profile = TestData.CreateDefaultProfile();
+        var components = new[]
+        {
+            TestData.CreatePipe("pipe-1", "B-100", "Line A", "Spec A", "12", numGaskets: "1", numClamps: "1"),
+            TestData.CreatePipe("pipe-2", "B-100", "Line A", "Spec A", "24", numGaskets: "1", numClamps: "1"),
+        };
+
+        var result = generator.Generate(components, profile);
+
+        var accessoryRows = result.Rows.Where(row => row.RowType == BomRowType.Accessory).ToList();
+        var gasketRow = Assert.Single(accessoryRows.Where(row => row.Values["Description"] == "Gaskets"));
+        var clampRow = Assert.Single(accessoryRows.Where(row => row.Values["Description"] == "Clamps"));
+
+        Assert.Equal(2m, gasketRow.Quantity);
+        Assert.Equal(2m, clampRow.Quantity);
+    }
+
+    [Fact]
     public void Generate_DoesNotExposeIgnoredPropertiesAsColumns()
     {
         var generator = new BomGenerator();
@@ -228,16 +249,46 @@ public sealed class BomGeneratorTests
     }
 
     [Fact]
-    public void Generate_UnmappedPrimaryFamilyRoutesToOther()
+    public void Generate_CustomPrimaryFamilyBecomesOwnSection()
     {
         var generator = new BomGenerator();
         var profile = TestData.CreateDefaultProfile();
-        var component = TestData.CreateClassifiedComponent("odd-1", "Unmapped", "OD-100", "Odd Part");
+        var component = TestData.CreateClassifiedComponent("valve-1", "Valves", "VL-100", "Valve Part");
 
         var result = generator.Generate([component], profile);
 
-        Assert.Single(result.Rows.Where(row => row.Section == KnownBomSections.Other));
+        var row = Assert.Single(result.Rows.Where(row => string.Equals(row.Section, "Valves", StringComparison.OrdinalIgnoreCase)));
+        Assert.Equal("VL-100", row.Values[KnownPropertyNames.BomDesc]);
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "unmapped-primary-family");
+    }
+
+    [Fact]
+    public void Generate_DynamicSectionsOrderBeforeOtherAndAccessories()
+    {
+        var generator = new BomGenerator();
+        var profile = TestData.CreateDefaultProfile();
+        var components = new ComponentRecord[]
+        {
+            TestData.CreatePipe("pipe-1", "B-100", "Line A", "Spec A", "12", numGaskets: "1"),
+            TestData.CreateClassifiedComponent("valve-1", "Valves", "VL-100", "Valve Part"),
+            new()
+            {
+                ComponentId = "other-1",
+                ComponentName = "other-1",
+                ConfigurationName = "Default",
+                Properties = new Dictionary<string, PropertyValue>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [KnownPropertyNames.BomDesc] = TestData.CreateProperty(KnownPropertyNames.BomDesc, "Other Part"),
+                    [KnownPropertyNames.Description] = TestData.CreateProperty(KnownPropertyNames.Description, "Other Part"),
+                },
+            },
+        };
+
+        var result = generator.Generate(components, profile);
+
+        Assert.Equal(
+            [KnownBomSections.Pipes, "Valves", KnownBomSections.Other, KnownBomSections.OtherAccessories],
+            result.Rows.Select(row => row.Section).Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
     }
 
     [Fact]

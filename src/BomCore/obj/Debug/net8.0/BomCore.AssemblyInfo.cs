@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BomCore")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2a4a9c1140bc03a2c89c44ebad33b77e3fdeb4f2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c605ca11f7776f6e8e32e2e2b8a0f6dfdda7b430")]
 [assembly: System.Reflection.AssemblyProductAttribute("BomCore")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BomCore")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

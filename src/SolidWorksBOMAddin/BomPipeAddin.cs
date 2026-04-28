@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 using BomCore;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
@@ -85,7 +86,6 @@ public sealed class BomPipeAddin : ISwAddin
             {
                 System.Windows.Forms.Application.EnableVisualStyles();
                 _previewShell = new BomPreviewShellForm(this);
-                _previewShell.TopMost = true;
                 _previewShell.FormClosed += (_, _) =>
                 {
                     if (_previewShell?.IsDisposed == true)
@@ -94,15 +94,10 @@ public sealed class BomPipeAddin : ISwAddin
                     }
                 };
 
-                var ownerWindow = GetSolidWorksOwnerWindow();
-                if (ownerWindow is null)
-                {
-                    _previewShell.Show();
-                }
-                else
-                {
-                    _previewShell.Show(ownerWindow);
-                }
+                // Keep BPM modeless, but do not show it as an owned SolidWorks window.
+                // SolidWorks can continue to process some accelerator keys through the owner relationship.
+                _previewShell.Show();
+                _previewShell.EnsureKeyboardActivation();
             }
             else
             {
@@ -111,11 +106,8 @@ public sealed class BomPipeAddin : ISwAddin
                     _previewShell.WindowState = System.Windows.Forms.FormWindowState.Normal;
                 }
 
-                _previewShell.TopMost = true;
                 _previewShell.Show();
-                _previewShell.Activate();
-                _previewShell.BringToFront();
-                _previewShell.Focus();
+                _previewShell.EnsureKeyboardActivation();
             }
 
             BomPipeLog.Info("OpenPreviewShell completed.");
@@ -136,6 +128,11 @@ public sealed class BomPipeAddin : ISwAddin
     internal ISldWorks RequireApplication()
     {
         return _application ?? throw new InvalidOperationException("The add-in is not connected to SolidWorks.");
+    }
+
+    internal IntPtr GetSolidWorksMainWindowHandle()
+    {
+        return Process.GetCurrentProcess().MainWindowHandle;
     }
 
     private void RegisterCommandGroup()

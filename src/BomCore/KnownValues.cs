@@ -57,6 +57,30 @@ public static class KnownBomSections
     public const string PipeCutList = Pipes;
     public const string OtherComponents = Other;
 
+    public static readonly IReadOnlyList<string> FixedConfigurableSections =
+    [
+        Pipes,
+        Tubes,
+        Wires,
+    ];
+
+    public static readonly IReadOnlyList<string> PreferredDynamicSections =
+    [
+        Components,
+        Connections,
+        Fittings,
+        Instruments,
+        Systems,
+    ];
+
+    public static readonly IReadOnlyList<string> DefaultVisibleConfigurableSections =
+    [
+        Pipes,
+        Tubes,
+        Wires,
+        Other,
+    ];
+
     public static readonly IReadOnlyList<string> DisplayOrder =
     [
         Pipes,
@@ -89,14 +113,33 @@ public static class KnownBomSections
 
     public static bool IsConfigurableSection(string? section)
     {
-        return !string.IsNullOrWhiteSpace(section) && ConfigurableSectionSet.Contains(section);
+        if (string.IsNullOrWhiteSpace(section))
+        {
+            return false;
+        }
+
+        var normalizedSection = NormalizeConfigurableSection(section);
+        return !string.Equals(normalizedSection, OtherAccessories, StringComparison.OrdinalIgnoreCase);
     }
 
     public static string NormalizeConfigurableSection(string? section)
     {
-        return ConfigurableSections.FirstOrDefault(
-            knownSection => string.Equals(knownSection, section, StringComparison.OrdinalIgnoreCase))
-            ?? Other;
+        if (string.IsNullOrWhiteSpace(section))
+        {
+            return Other;
+        }
+
+        if (string.Equals(section, LegacyPipeAccessories, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(section, PipeAccessories, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(section, OtherAccessories, StringComparison.OrdinalIgnoreCase))
+        {
+            return OtherAccessories;
+        }
+
+        return ConfigurableSections
+            .Concat(FixedConfigurableSections)
+            .FirstOrDefault(knownSection => string.Equals(knownSection, section, StringComparison.OrdinalIgnoreCase))
+            ?? section.Trim();
     }
 
     public static string NormalizeAccessorySection(string? section)
@@ -152,6 +195,58 @@ public static class KnownBomSections
     public static bool IsClassMappedSection(string? section)
     {
         return !string.IsNullOrWhiteSpace(section) && ClassMappedSectionSet.Contains(section);
+    }
+
+    public static bool IsAccessorySection(string? section)
+    {
+        return string.Equals(NormalizeAccessorySection(section), OtherAccessories, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static IReadOnlyList<string> BuildConfigurableSections(IEnumerable<string>? candidateSections)
+    {
+        var normalizedSections = (candidateSections ?? [])
+            .Select(NormalizeConfigurableSection)
+            .Where(section => !string.Equals(section, OtherAccessories, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var dynamicSections = normalizedSections
+            .Where(section => !FixedConfigurableSections.Contains(section, StringComparer.OrdinalIgnoreCase)
+                && !string.Equals(section, Other, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var orderedDynamicSections = PreferredDynamicSections
+            .Where(section => dynamicSections.Contains(section, StringComparer.OrdinalIgnoreCase))
+            .Concat(dynamicSections
+                .Where(section => !PreferredDynamicSections.Contains(section, StringComparer.OrdinalIgnoreCase))
+                .OrderBy(section => section, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+
+        return FixedConfigurableSections
+            .Concat(orderedDynamicSections)
+            .Append(Other)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public static IReadOnlyList<string> OrderSections(IEnumerable<string> sections)
+    {
+        var normalizedSections = (sections ?? [])
+            .Select(section => IsAccessorySection(section) ? OtherAccessories : NormalizeConfigurableSection(section))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var orderedSections = BuildConfigurableSections(
+            normalizedSections.Where(section => !string.Equals(section, OtherAccessories, StringComparison.OrdinalIgnoreCase)))
+            .Where(section => normalizedSections.Contains(section, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+
+        if (normalizedSections.Contains(OtherAccessories, StringComparer.OrdinalIgnoreCase))
+        {
+            orderedSections.Add(OtherAccessories);
+        }
+
+        return orderedSections;
     }
 }
 

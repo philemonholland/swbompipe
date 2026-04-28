@@ -42,8 +42,12 @@ internal sealed class BomPreviewShellForm : Form
     private readonly TabControl _selectedPropertiesTabs;
     private readonly Label _summaryLabel;
     private readonly Label _profileLabel;
+    private readonly Label _familyLabel;
     private readonly Label _statusLabel;
     private readonly TabControl _tabControl;
+    private readonly SolidWorksKeyboardMessageFilter _keyboardMessageFilter;
+    private readonly SolidWorksMainWindowKeyboardInterceptor _solidWorksKeyboardInterceptor;
+    private readonly SolidWorksPreTranslateKeyboardHook _preTranslateKeyboardHook;
 
     private IReadOnlyList<ComponentRecord> _scannedComponents = [];
     private IReadOnlyList<BomDiagnostic> _profileDiagnostics = [];
@@ -54,14 +58,22 @@ internal sealed class BomPreviewShellForm : Form
     private string? _externalSettingsPath;
     private int _componentsScanned;
     private int? _componentsSkipped;
+    private IReadOnlyList<string> _boundConfigurableSections = KnownBomSections.DefaultVisibleConfigurableSections;
+    private IReadOnlyList<string> _visibleConfigurableSections = KnownBomSections.DefaultVisibleConfigurableSections;
+    private IReadOnlyList<string> _detectedConfigurableSections = [];
+    private bool _keyboardActivationScheduled;
+    private bool _isEnsuringKeyboardActivation;
+    private Control? _scheduledKeyboardTarget;
 
     public BomPreviewShellForm(BomPipeAddin addin)
     {
         _addin = addin ?? throw new ArgumentNullException(nameof(addin));
+        _keyboardMessageFilter = new SolidWorksKeyboardMessageFilter(this);
+        _solidWorksKeyboardInterceptor = new SolidWorksMainWindowKeyboardInterceptor(this);
+        _preTranslateKeyboardHook = new SolidWorksPreTranslateKeyboardHook(this);
 
         Text = "BOMPipe Mapping Workspace";
         StartPosition = FormStartPosition.CenterScreen;
-        TopMost = true;
         BackColor = ShellBackColor;
         Font = new Font("Segoe UI", 9F);
         Width = 1280;
@@ -88,25 +100,32 @@ internal sealed class BomPreviewShellForm : Form
             WrapContents = true,
             FlowDirection = FlowDirection.LeftToRight,
             BackColor = ShellBackColor,
+            Margin = new Padding(0, 0, 0, 8),
         };
 
-        commandPanel.Controls.Add(CreateActionButton("Read Selected Part", (_, _) => ReadSelectedPartProperties()));
-        commandPanel.Controls.Add(CreateActionButton("Scan Assembly", (_, _) => ScanActiveAssembly()));
-        commandPanel.Controls.Add(CreateActionButton("Mapping", (_, _) => ShowMappingTab()));
-        commandPanel.Controls.Add(CreateActionButton("Refresh Preview", (_, _) => RefreshMappingPreview()));
-        commandPanel.Controls.Add(CreateActionButton("Generate Preview", (_, _) => GenerateBomPreview()));
-        commandPanel.Controls.Add(CreateActionButton("Export CSV", (_, _) => ExportBom("csv")));
-        commandPanel.Controls.Add(CreateActionButton("Export Excel", (_, _) => ExportBom("xlsx")));
-        commandPanel.Controls.Add(CreateActionButton("Import Settings", (_, _) => ImportSettings()));
-        commandPanel.Controls.Add(CreateActionButton("Export Settings", (_, _) => ExportSettings()));
-        commandPanel.Controls.Add(CreateActionButton("Set Settings File", (_, _) => SetSettingsFile()));
-        commandPanel.Controls.Add(CreateActionButton("Save Mapping Profile", (_, _) => SaveMapping(), accent: true));
+        commandPanel.Controls.Add(CreateCommandGroup(
+            "Read / Scan",
+            CreateActionButton("Read Selected Part", (_, _) => ReadSelectedPartProperties()),
+            CreateActionButton("Scan Assembly", (_, _) => ScanActiveAssembly(), accent: true)));
+        commandPanel.Controls.Add(CreateCommandGroup(
+            "Mapping / Settings",
+            CreateActionButton("Mapping", (_, _) => ShowMappingTab()),
+            CreateActionButton("Save Mapping Profile", (_, _) => SaveMapping(), accent: true),
+            CreateActionButton("Set Settings File", (_, _) => SetSettingsFile()),
+            CreateActionButton("Import Settings", (_, _) => ImportSettings()),
+            CreateActionButton("Export Settings", (_, _) => ExportSettings())));
+        commandPanel.Controls.Add(CreateCommandGroup(
+            "Preview / Export",
+            CreateActionButton("Refresh Preview", (_, _) => RefreshMappingPreview()),
+            CreateActionButton("Generate Preview", (_, _) => GenerateBomPreview(), accent: true),
+            CreateActionButton("Export CSV", (_, _) => ExportBom("csv")),
+            CreateActionButton("Export Excel", (_, _) => ExportBom("xlsx"))));
 
         var infoPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 2,
+            RowCount = 3,
             AutoSize = true,
             Padding = new Padding(12),
             Margin = new Padding(0, 0, 0, 10),
@@ -128,8 +147,16 @@ internal sealed class BomPreviewShellForm : Form
             ForeColor = Color.FromArgb(224, 230, 219),
             Text = "Rows are property-driven. Component names, file paths, and configuration names are diagnostics only.",
         };
+        _familyLabel = new Label
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            ForeColor = Color.FromArgb(209, 219, 203),
+            Text = "Detected Primary Family sections: (scan an assembly to populate)",
+        };
         infoPanel.Controls.Add(_summaryLabel, 0, 0);
         infoPanel.Controls.Add(_profileLabel, 0, 1);
+        infoPanel.Controls.Add(_familyLabel, 0, 2);
 
         _tabControl = new TabControl
         {
@@ -176,8 +203,231 @@ internal sealed class BomPreviewShellForm : Form
         root.Controls.Add(_statusLabel, 0, 3);
         Controls.Add(root);
 
+        RegisterKeyboardFocusGuards(root);
+        Application.AddMessageFilter(_keyboardMessageFilter);
+        _preTranslateKeyboardHook.Install();
+        EnsureSolidWorksKeyboardInterceptor();
         _externalSettingsPath = LoadConfiguredSettingsPath();
         LoadDefaultProfileContext();
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        EnsureSolidWorksKeyboardInterceptor();
+        ScheduleKeyboardActivation();
+    }
+
+    protected override void OnActivated(EventArgs e)
+    {
+        base.OnActivated(e);
+        EnsureSolidWorksKeyboardInterceptor();
+        ScheduleKeyboardActivation();
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        Application.RemoveMessageFilter(_keyboardMessageFilter);
+        _solidWorksKeyboardInterceptor.Dispose();
+        _preTranslateKeyboardHook.Dispose();
+        base.OnFormClosed(e);
+    }
+
+    internal void EnsureKeyboardActivation(Control? preferredControl = null)
+    {
+        if (_isEnsuringKeyboardActivation || IsDisposed || !Visible || !IsHandleCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            _isEnsuringKeyboardActivation = true;
+            var target = preferredControl is not null && preferredControl.CanFocus
+                ? preferredControl
+                : GetPreferredKeyboardTarget();
+            NativeWindowActivation.Activate(this, target);
+        }
+        finally
+        {
+            _isEnsuringKeyboardActivation = false;
+        }
+    }
+
+    private void ScheduleKeyboardActivation(Control? preferredControl = null)
+    {
+        if (_keyboardActivationScheduled || _isEnsuringKeyboardActivation || IsDisposed || !IsHandleCreated)
+        {
+            if (preferredControl is not null)
+            {
+                _scheduledKeyboardTarget = preferredControl;
+            }
+
+            return;
+        }
+
+        _scheduledKeyboardTarget = preferredControl;
+        _keyboardActivationScheduled = true;
+        BeginInvoke(new Action(() =>
+        {
+            _keyboardActivationScheduled = false;
+            var target = _scheduledKeyboardTarget;
+            _scheduledKeyboardTarget = null;
+            EnsureKeyboardActivation(target);
+        }));
+    }
+
+    internal bool ShouldTrapExternalKeyboardMessage(IntPtr targetHandle)
+    {
+        if (IsDisposed || !Visible || !IsHandleCreated || targetHandle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        if (NativeWindowActivation.IsWindowOrDescendant(Handle, targetHandle))
+        {
+            return false;
+        }
+
+        if (ContainsFocus)
+        {
+            return true;
+        }
+
+        var focusedHandle = NativeWindowActivation.GetFocusedWindow();
+        return NativeWindowActivation.IsWindowOrDescendant(Handle, focusedHandle);
+    }
+
+    internal bool TryInterceptSingleLetterShortcut(IntPtr virtualKeyParam, IntPtr lParam)
+    {
+        if (IsDisposed || !Visible || !IsHandleCreated)
+        {
+            return false;
+        }
+
+        var focusedHandle = NativeWindowActivation.GetFocusedWindow();
+        if (!NativeWindowActivation.IsWindowOrDescendant(Handle, focusedHandle))
+        {
+            return false;
+        }
+
+        if (!TryTranslateSingleLetterShortcut(virtualKeyParam.ToInt32(), focusedHandle, out var character))
+        {
+            return false;
+        }
+
+        NativeWindowActivation.PostCharacter(focusedHandle, character, lParam);
+        return true;
+    }
+
+    private void EnsureSolidWorksKeyboardInterceptor()
+    {
+        var solidWorksHandle = _addin.GetSolidWorksMainWindowHandle();
+        if (solidWorksHandle == IntPtr.Zero || solidWorksHandle == Handle)
+        {
+            return;
+        }
+
+        _solidWorksKeyboardInterceptor.Attach(solidWorksHandle);
+    }
+
+    private static bool HasShortcutModifiersActive()
+    {
+        var modifiers = ModifierKeys;
+        return modifiers.HasFlag(Keys.Control) || modifiers.HasFlag(Keys.Alt);
+    }
+
+    private static bool IsSingleLetterShortcutKey(int virtualKey)
+    {
+        return virtualKey >= 'A' && virtualKey <= 'Z';
+    }
+
+    private bool IsTextEntryControlFocused(IntPtr focusedHandle)
+    {
+        for (Control? control = Control.FromChildHandle(focusedHandle); control is not null; control = control.Parent)
+        {
+            if (control is DataGridView dataGridView
+                && dataGridView.CurrentCell is not null
+                && !dataGridView.ReadOnly
+                && !dataGridView.CurrentCell.ReadOnly
+                && dataGridView.CurrentCell.EditType is not null
+                && typeof(TextBox).IsAssignableFrom(dataGridView.CurrentCell.EditType))
+            {
+                return true;
+            }
+
+            if (control is TextBoxBase)
+            {
+                return true;
+            }
+
+            if (control is ComboBox comboBox && comboBox.DropDownStyle != ComboBoxStyle.DropDownList)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryTranslateSingleLetterShortcut(int virtualKey, IntPtr focusedHandle, out char character)
+    {
+        character = '\0';
+
+        if (!IsSingleLetterShortcutKey(virtualKey)
+            || HasShortcutModifiersActive()
+            || !IsTextEntryControlFocused(focusedHandle))
+        {
+            return false;
+        }
+
+        var uppercase = Control.IsKeyLocked(Keys.CapsLock) ^ ModifierKeys.HasFlag(Keys.Shift);
+        character = (char)(uppercase ? virtualKey : virtualKey + 32);
+        return true;
+    }
+
+    private void RegisterKeyboardFocusGuards(Control root)
+    {
+        AttachKeyboardFocusGuard(root);
+
+        foreach (Control child in root.Controls)
+        {
+            RegisterKeyboardFocusGuards(child);
+        }
+    }
+
+    private void AttachKeyboardFocusGuard(Control control)
+    {
+        if (control is TextBoxBase
+            || control is DataGridView
+            || control is TabControl
+            || control is ListBox
+            || control is ComboBox)
+        {
+            control.Enter -= HandleKeyboardFocusGuardEnter;
+            control.Enter += HandleKeyboardFocusGuardEnter;
+        }
+
+        if (control is DataGridView grid)
+        {
+            grid.EditingControlShowing -= HandleGridEditingControlShowing;
+            grid.EditingControlShowing += HandleGridEditingControlShowing;
+        }
+    }
+
+    private void HandleKeyboardFocusGuardEnter(object? sender, EventArgs e)
+    {
+        if (sender is Control control)
+        {
+            ScheduleKeyboardActivation(control);
+        }
+    }
+
+    private void HandleGridEditingControlShowing(object? sender, DataGridViewEditingControlShowingEventArgs e)
+    {
+        e.Control.Enter -= HandleKeyboardFocusGuardEnter;
+        e.Control.Enter += HandleKeyboardFocusGuardEnter;
+        ScheduleKeyboardActivation(e.Control);
     }
 
     private static Button CreateActionButton(string text, EventHandler onClick, bool accent = false)
@@ -198,6 +448,34 @@ internal sealed class BomPreviewShellForm : Form
         button.FlatAppearance.MouseOverBackColor = accent ? ShellAccentDarkColor : Color.FromArgb(247, 241, 226);
         button.Click += onClick;
         return button;
+    }
+
+    private static GroupBox CreateCommandGroup(string title, params Control[] controls)
+    {
+        var group = new GroupBox
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new Padding(10, 14, 10, 8),
+            Margin = new Padding(0, 0, 12, 8),
+            Text = title,
+            BackColor = ShellSurfaceColor,
+            ForeColor = ShellTextColor,
+        };
+
+        var layout = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            Dock = DockStyle.Fill,
+            BackColor = ShellSurfaceColor,
+        };
+
+        layout.Controls.AddRange(controls);
+        group.Controls.Add(layout);
+        return group;
     }
 
     private static DataGridView CreateReadOnlyGrid()
@@ -236,6 +514,33 @@ internal sealed class BomPreviewShellForm : Form
         grid.RowTemplate.Height = 26;
     }
 
+    private Control? GetPreferredKeyboardTarget()
+    {
+        var activeControl = GetDeepestActiveControl(this);
+        if (activeControl is not null && activeControl.CanFocus)
+        {
+            return activeControl;
+        }
+
+        if (_tabControl.CanFocus)
+        {
+            return _tabControl;
+        }
+
+        return CanFocus ? this : null;
+    }
+
+    private static Control? GetDeepestActiveControl(ContainerControl container)
+    {
+        Control? activeControl = container.ActiveControl;
+        while (activeControl is ContainerControl nestedContainer && nestedContainer.ActiveControl is not null)
+        {
+            activeControl = nestedContainer.ActiveControl;
+        }
+
+        return activeControl;
+    }
+
     private DataGridView CreatePipeColumnsGrid()
     {
         var grid = new DataGridView
@@ -262,18 +567,46 @@ internal sealed class BomPreviewShellForm : Form
 
     private TabControl CreateSectionTabs()
     {
-        var tabControl = new TabControl
+        return new TabControl
         {
             Dock = DockStyle.Fill,
         };
+    }
 
-        foreach (var section in KnownBomSections.ConfigurableSections)
+    private void EnsureSectionEditors(IEnumerable<string> sections)
+    {
+        foreach (var section in KnownBomSections.BuildConfigurableSections(sections))
         {
-            var rows = new BindingList<SectionColumnMappingRow>();
-            _sectionColumnsBySection[section] = rows;
+            if (!_sectionColumnsBySection.ContainsKey(section))
+            {
+                _sectionColumnsBySection[section] = new BindingList<SectionColumnMappingRow>();
+            }
 
-            var grid = CreateSectionColumnsGrid(rows);
-            _sectionColumnGrids[section] = grid;
+            if (!_sectionColumnGrids.ContainsKey(section))
+            {
+                _sectionColumnGrids[section] = CreateSectionColumnsGrid(_sectionColumnsBySection[section]);
+            }
+        }
+    }
+
+    private void RebuildSectionTabs(IEnumerable<string> visibleSections)
+    {
+        var normalizedVisibleSections = KnownBomSections.BuildConfigurableSections(visibleSections);
+        var previouslySelectedSection = _sectionTabs.SelectedTab?.Text;
+
+        _sectionTabs.TabPages.Clear();
+
+        foreach (var section in normalizedVisibleSections)
+        {
+            if (!_sectionColumnGrids.TryGetValue(section, out var grid))
+            {
+                continue;
+            }
+
+            if (grid.Parent is Control existingParent)
+            {
+                existingParent.Controls.Remove(grid);
+            }
 
             var page = new TabPage(section)
             {
@@ -281,7 +614,12 @@ internal sealed class BomPreviewShellForm : Form
                 BackColor = ShellSurfaceColor,
             };
             page.Controls.Add(grid);
-            tabControl.TabPages.Add(page);
+            _sectionTabs.TabPages.Add(page);
+        }
+
+        if (_accessoryRulesGrid.Parent is Control accessoryParent)
+        {
+            accessoryParent.Controls.Remove(_accessoryRulesGrid);
         }
 
         var accessoryPage = new TabPage(KnownBomSections.OtherAccessories)
@@ -290,9 +628,45 @@ internal sealed class BomPreviewShellForm : Form
             BackColor = ShellSurfaceColor,
         };
         accessoryPage.Controls.Add(_accessoryRulesGrid);
-        tabControl.TabPages.Add(accessoryPage);
+        _sectionTabs.TabPages.Add(accessoryPage);
 
-        return tabControl;
+        _visibleConfigurableSections = normalizedVisibleSections;
+
+        var selectedTab = !string.IsNullOrWhiteSpace(previouslySelectedSection)
+            ? _sectionTabs.TabPages
+                .Cast<TabPage>()
+                .FirstOrDefault(page => string.Equals(page.Text, previouslySelectedSection, StringComparison.OrdinalIgnoreCase))
+            : null;
+
+        _sectionTabs.SelectedTab = selectedTab ?? _sectionTabs.TabPages.Cast<TabPage>().FirstOrDefault();
+    }
+
+    private PropertyDiscoveryResult? BuildCurrentDiscovery()
+    {
+        return _scannedComponents.Count == 0
+            ? null
+            : _propertyDiscoveryService.DiscoverFromComponents(_scannedComponents);
+    }
+
+    private IReadOnlyList<string> GetVisibleConfigurableSections(PropertyDiscoveryResult? discovery)
+    {
+        var effectiveDiscovery = discovery ?? BuildCurrentDiscovery();
+        return effectiveDiscovery is null || effectiveDiscovery.DiscoveredSections.Count == 0
+            ? KnownBomSections.DefaultVisibleConfigurableSections
+            : KnownBomSections.BuildConfigurableSections(effectiveDiscovery.DiscoveredSections);
+    }
+
+    private void SyncVisibleSections(BomProfile profile, PropertyDiscoveryResult? discovery)
+    {
+        var effectiveDiscovery = discovery ?? BuildCurrentDiscovery();
+        var visibleSections = GetVisibleConfigurableSections(effectiveDiscovery);
+        var boundSections = profile.GetConfiguredConfigurableSections()
+            .Concat(visibleSections);
+
+        _detectedConfigurableSections = effectiveDiscovery?.DiscoveredSections ?? [];
+        _boundConfigurableSections = KnownBomSections.BuildConfigurableSections(boundSections);
+        EnsureSectionEditors(_boundConfigurableSections);
+        RebuildSectionTabs(visibleSections);
     }
 
     private DataGridView CreateSectionColumnsGrid(BindingList<SectionColumnMappingRow> rows)
@@ -664,7 +1038,7 @@ internal sealed class BomPreviewShellForm : Form
             UpdateSummary();
 
             _tabControl.SelectedTab = _tabControl.TabPages["MappingTab"] ?? _tabControl.TabPages[1];
-            SetStatus($"Scanned {_componentsScanned} component(s) from {_assemblyDisplayName ?? "the active assembly"}.");
+            SetStatus($"Scanned {_componentsScanned} component(s) from {_assemblyDisplayName ?? "the active assembly"}. {BuildDetectedSectionsSummary()}");
         }
         catch (Exception ex)
         {
@@ -674,6 +1048,8 @@ internal sealed class BomPreviewShellForm : Form
 
     private void ShowMappingTab()
     {
+        SyncVisibleSections(_currentProfile, discovery: null);
+        UpdateSummary();
         _tabControl.SelectedTab = _tabControl.TabPages["MappingTab"] ?? _tabControl.TabPages[1];
         SetStatus("Review or edit the BOM mapping, then generate a preview or export.");
     }
@@ -774,10 +1150,11 @@ internal sealed class BomPreviewShellForm : Form
         try
         {
             var profile = BuildProfileFromEditor();
+            var diagnostics = ValidateProfileForPersistence(profile, "save the mapping profile");
             var targetPath = ResolveProfileSavePath();
             _profileStore.SaveToPath(profile, targetPath);
             _profileSourcePath = targetPath;
-            _profileDiagnostics = BomProfileSerializer.Validate(profile);
+            _profileDiagnostics = diagnostics;
             BindDiagnostics(_profileDiagnostics);
             BindMappingDiagnostics(_profileDiagnostics);
             UpdateSummary();
@@ -849,20 +1226,14 @@ internal sealed class BomPreviewShellForm : Form
             return _profileStore.LoadEffectiveProfile(assemblyPath, options);
         }
 
-        var profile = _profileStore.LoadFromPath(options.DefaultProfilePath);
-        return new ProfileLoadResult
-        {
-            Profile = profile,
-            SourcePath = options.DefaultProfilePath,
-            Diagnostics = BomProfileSerializer.Validate(profile),
-        };
+        return _profileStore.LoadDefaultProfile(options);
     }
 
     private ProfileStoreOptions BuildProfileStoreOptions()
     {
         return new ProfileStoreOptions
         {
-            DefaultProfilePath = Path.Combine(GetAddinDirectory(), "profiles", "default.pipebom.json"),
+            DefaultProfilePath = BuiltInProfileResolver.ResolvePath(),
             UserProfileDirectory = Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
                 "AFCA",
@@ -891,14 +1262,10 @@ internal sealed class BomPreviewShellForm : Form
         };
     }
 
-    private static string GetAddinDirectory()
-    {
-        return Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)
-            ?? AppContext.BaseDirectory;
-    }
-
     private void BindProfile(BomProfile profile, PropertyDiscoveryResult? discovery)
     {
+        SyncVisibleSections(profile, discovery);
+
         _pipeColumns.Clear();
         foreach (var column in profile.GetSectionColumns(KnownBomSections.Pipes).OrderBy(column => column.Order))
         {
@@ -913,7 +1280,7 @@ internal sealed class BomPreviewShellForm : Form
             });
         }
 
-        foreach (var section in KnownBomSections.ConfigurableSections)
+        foreach (var section in _boundConfigurableSections)
         {
             if (!_sectionColumnsBySection.TryGetValue(section, out var rows))
             {
@@ -975,9 +1342,14 @@ internal sealed class BomPreviewShellForm : Form
     {
         var profile = _profileStore.LoadFromPath(path);
         var diagnostics = BomProfileSerializer.Validate(profile);
-        if (diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+        var errorDiagnostics = diagnostics
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToList();
+        if (errorDiagnostics.Count > 0)
         {
-            throw new InvalidOperationException($"Settings file '{path}' contains invalid BOM profile settings.");
+            throw new InvalidOperationException(BuildInvalidSettingsMessage(
+                $"Settings file '{path}' contains invalid BOM profile settings.",
+                errorDiagnostics));
         }
 
         _currentProfile = profile;
@@ -1019,7 +1391,6 @@ internal sealed class BomPreviewShellForm : Form
         var headers = CollectHeaders(result.Rows);
         var table = new DataTable();
         table.Columns.Add("Section");
-        table.Columns.Add("Row Type");
         foreach (var header in headers)
         {
             table.Columns.Add(header);
@@ -1031,7 +1402,6 @@ internal sealed class BomPreviewShellForm : Form
         {
             var item = table.NewRow();
             item["Section"] = row.Section;
-            item["Row Type"] = row.RowType.ToString();
             foreach (var header in headers)
             {
                 item[header] = row.Values.TryGetValue(header, out var value) ? value : string.Empty;
@@ -1086,7 +1456,21 @@ internal sealed class BomPreviewShellForm : Form
         var settingsText = string.IsNullOrWhiteSpace(_externalSettingsPath)
             ? "Local/default lookup"
             : _externalSettingsPath;
-        _profileLabel.Text = $"Profile: {_profileSourcePath ?? "Built-in default"} | Settings file: {settingsText} | Sections: {string.Join(", ", KnownBomSections.ConfigurableSections)}";
+        _profileLabel.Text = $"Profile: {_profileSourcePath ?? "Built-in default"} | Settings file: {settingsText} | Sections: {string.Join(", ", _visibleConfigurableSections)}";
+        _familyLabel.Text = $"Detected Primary Family sections: {BuildDetectedSectionsSummary()}";
+    }
+
+    private string BuildDetectedSectionsSummary()
+    {
+        var detectedSections = _detectedConfigurableSections
+            .Select(section => string.Equals(section, KnownBomSections.Other, StringComparison.OrdinalIgnoreCase)
+                ? "Other (missing Primary Family)"
+                : section)
+            .ToList();
+
+        return detectedSections.Count == 0
+            ? "(scan an assembly to populate)"
+            : string.Join(", ", detectedSections);
     }
 
     private IReadOnlyList<string> BuildDiscoveredPropertyItems(IEnumerable<string> propertyNames)
@@ -1131,7 +1515,7 @@ internal sealed class BomPreviewShellForm : Form
             grid.EndEdit();
         }
 
-        var sectionProfiles = KnownBomSections.ConfigurableSections
+        var sectionProfiles = _boundConfigurableSections
             .Select(section => new BomSectionColumnProfile
             {
                 Section = section,
@@ -1234,7 +1618,7 @@ internal sealed class BomPreviewShellForm : Form
 
     private void AddPropertyToActiveSection(string propertyName)
     {
-        var section = _sectionTabs.SelectedTab?.Text ?? KnownBomSections.Components;
+        var section = _sectionTabs.SelectedTab?.Text ?? KnownBomSections.Other;
         if (string.Equals(section, KnownBomSections.OtherAccessories, StringComparison.OrdinalIgnoreCase))
         {
             _accessoryRules.Add(new AccessoryMappingRow
@@ -1268,7 +1652,7 @@ internal sealed class BomPreviewShellForm : Form
 
     private void RemoveSelectedSectionColumn()
     {
-        var section = _sectionTabs.SelectedTab?.Text ?? KnownBomSections.Components;
+        var section = _sectionTabs.SelectedTab?.Text ?? KnownBomSections.Other;
         if (string.Equals(section, KnownBomSections.OtherAccessories, StringComparison.OrdinalIgnoreCase))
         {
             RemoveSelectedAccessoryRule();
@@ -1411,10 +1795,11 @@ internal sealed class BomPreviewShellForm : Form
             }
 
             var profile = BuildProfileFromEditor();
+            var diagnostics = ValidateProfileForPersistence(profile, "export settings");
             _profileStore.SaveToPath(profile, dialog.FileName);
             ActivateExternalSettingsPath(dialog.FileName);
             _currentProfile = profile;
-            _profileDiagnostics = BomProfileSerializer.Validate(profile);
+            _profileDiagnostics = diagnostics;
             _profileSourcePath = dialog.FileName;
             BindDiagnostics(_profileDiagnostics);
             BindMappingDiagnostics(_profileDiagnostics);
@@ -1476,6 +1861,7 @@ internal sealed class BomPreviewShellForm : Form
             return;
         }
 
+        SyncVisibleSections(_currentProfile, discovery: null);
         var profile = BuildProfileFromEditor();
         var result = _bomGenerator.Generate(_scannedComponents, profile);
         var diagnostics = _profileDiagnostics
@@ -1508,6 +1894,39 @@ internal sealed class BomPreviewShellForm : Form
         return Path.Combine(
             BuildProfileStoreOptions().UserProfileDirectory!,
             BuildProfileStoreOptions().DefaultProfileFileName);
+    }
+
+    private static IReadOnlyList<BomDiagnostic> ValidateProfileForPersistence(BomProfile profile, string action)
+    {
+        var diagnostics = BomProfileSerializer.Validate(profile);
+        var errorDiagnostics = diagnostics
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToList();
+
+        if (errorDiagnostics.Count > 0)
+        {
+            throw new InvalidOperationException(BuildInvalidSettingsMessage(
+                $"Cannot {action} while the BPM mapping has validation errors.",
+                errorDiagnostics));
+        }
+
+        return diagnostics;
+    }
+
+    private static string BuildInvalidSettingsMessage(string summary, IReadOnlyList<BomDiagnostic> errorDiagnostics)
+    {
+        var detailLines = errorDiagnostics
+            .Select(diagnostic => $"- {diagnostic.Message}")
+            .Distinct(StringComparer.Ordinal)
+            .Take(5)
+            .ToList();
+
+        if (detailLines.Count == 0)
+        {
+            return summary;
+        }
+
+        return $"{summary}{System.Environment.NewLine}{string.Join(System.Environment.NewLine, detailLines)}";
     }
 
     private string BuildDefaultExportFileName(string format)

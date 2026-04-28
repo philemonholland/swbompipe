@@ -23,18 +23,25 @@
       "order": 2
     },
     {
+      "sourceProperty": "Component Type",
+      "displayName": "Component Type",
+      "enabled": true,
+      "groupBy": true,
+      "order": 3
+    },
+    {
       "sourceProperty": "Specification",
       "displayName": "Specification",
       "enabled": true,
       "groupBy": true,
-      "order": 3
+      "order": 4
     },
     {
       "sourceProperty": "PipeLength",
       "displayName": "Cut Length",
       "enabled": true,
       "groupBy": true,
-      "order": 4,
+      "order": 5,
       "unit": "in"
     }
   ],
@@ -57,18 +64,25 @@
           "order": 2
         },
         {
+          "sourceProperty": "Component Type",
+          "displayName": "Component Type",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3
+        },
+        {
           "sourceProperty": "Specification",
           "displayName": "Specification",
           "enabled": true,
           "groupBy": true,
-          "order": 3
+          "order": 4
         },
         {
           "sourceProperty": "PipeLength",
           "displayName": "Cut Length",
           "enabled": true,
           "groupBy": true,
-          "order": 4,
+          "order": 5,
           "unit": "in"
         }
       ]
@@ -91,11 +105,18 @@
           "order": 2
         },
         {
+          "sourceProperty": "Component Type",
+          "displayName": "Component Type",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3
+        },
+        {
           "sourceProperty": "TubeLength",
           "displayName": "Tube Length",
           "enabled": true,
           "groupBy": true,
-          "order": 3,
+          "order": 4,
           "unit": "in"
         }
       ]
@@ -118,11 +139,18 @@
           "order": 2
         },
         {
+          "sourceProperty": "Component Type",
+          "displayName": "Component Type",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3
+        },
+        {
           "sourceProperty": "WireLength",
           "displayName": "Wire Length",
           "enabled": true,
           "groupBy": true,
-          "order": 3,
+          "order": 4,
           "unit": "in"
         }
       ]
@@ -143,6 +171,13 @@
           "enabled": true,
           "groupBy": true,
           "order": 2
+        },
+        {
+          "sourceProperty": "Component Type",
+          "displayName": "Component Type",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3
         }
       ]
     },
@@ -162,6 +197,13 @@
           "enabled": true,
           "groupBy": true,
           "order": 2
+        },
+        {
+          "sourceProperty": "Component Type",
+          "displayName": "Component Type",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3
         }
       ]
     },
@@ -181,6 +223,13 @@
           "enabled": true,
           "groupBy": true,
           "order": 2
+        },
+        {
+          "sourceProperty": "Component Type",
+          "displayName": "Component Type",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3
         }
       ]
     },
@@ -200,6 +249,13 @@
           "enabled": true,
           "groupBy": true,
           "order": 2
+        },
+        {
+          "sourceProperty": "Component Type",
+          "displayName": "Component Type",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3
         }
       ]
     },
@@ -219,47 +275,100 @@
           "enabled": true,
           "groupBy": true,
           "order": 2
+        },
+        {
+          "sourceProperty": "Component Type",
+          "displayName": "Component Type",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3
+        }
+      ]
+    },
+    {
+      "section": "Other",
+      "columns": [
+        {
+          "sourceProperty": "BOMDesc",
+          "displayName": "BOMDesc",
+          "enabled": true,
+          "groupBy": true,
+          "order": 1
+        },
+        {
+          "sourceProperty": "Description",
+          "displayName": "Description",
+          "enabled": true,
+          "groupBy": true,
+          "order": 2
+        },
+        {
+          "sourceProperty": "Component Type",
+          "displayName": "Component Type",
+          "enabled": true,
+          "groupBy": true,
+          "order": 3
         }
       ]
     }
   ],
   "sectionRules": [
     {
-      "sourceProperty": "Class",
+      "sourceProperty": "Primary Family",
+      "matchValue": "Pipes",
+      "section": "Pipes"
+    },
+    {
+      "sourceProperty": "Primary Family",
+      "matchValue": "Tubes",
+      "section": "Tubes"
+    },
+    {
+      "sourceProperty": "Primary Family",
+      "matchValue": "Wires",
+      "section": "Wires"
+    },
+    {
+      "sourceProperty": "Primary Family",
       "matchValue": "Components",
       "section": "Components"
     },
     {
-      "sourceProperty": "Class",
+      "sourceProperty": "Primary Family",
       "matchValue": "Connections",
       "section": "Connections"
     },
     {
-      "sourceProperty": "Class",
+      "sourceProperty": "Primary Family",
       "matchValue": "Fittings",
       "section": "Fittings"
     },
     {
-      "sourceProperty": "Class",
+      "sourceProperty": "Primary Family",
       "matchValue": "Instruments",
       "section": "Instruments"
     },
     {
-      "sourceProperty": "Class",
+      "sourceProperty": "Primary Family",
       "matchValue": "Systems",
       "section": "Systems"
+    },
+    {
+      "sourceProperty": "Primary Family",
+      "matchValue": "Other",
+      "section": "Other"
     }
   ],
   "accessoryRules": [
     {
       "sourceProperty": "NumGaskets",
       "displayName": "Gaskets",
-      "bomSection": "Pipe Accessories"
+      "bomSection": "Other Accessories"
     },
     {
       "sourceProperty": "NumClamps",
       "displayName": "Clamps",
-      "bomSection": "Pipe Accessories"
+      "bomSection": "Other Accessories"
     }
   ],
   "ignoredProperties": [

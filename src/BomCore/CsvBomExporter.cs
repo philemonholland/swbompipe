@@ -12,7 +12,7 @@ public sealed class CsvBomExporter : IBomExporter
 
         using var writer = new StreamWriter(output, new UTF8Encoding(false), leaveOpen: true);
 
-        foreach (var section in KnownBomSections.DisplayOrder)
+        foreach (var section in KnownBomSections.OrderSections(result.Rows.Select(row => row.Section)))
         {
             var sectionRows = result.Rows
                 .Where(row => string.Equals(row.Section, section, StringComparison.OrdinalIgnoreCase))

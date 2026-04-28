@@ -40,4 +40,37 @@ public sealed class PropertyDiscoveryServiceTests
         Assert.Contains(KnownPropertyNames.BlueGasket, result.IgnoredProperties);
         Assert.Contains(KnownPropertyNames.WhiteGasket, result.IgnoredProperties);
     }
+
+    [Fact]
+    public void DiscoverFromComponents_ReportsCustomPrimaryFamilySections()
+    {
+        var service = new PropertyDiscoveryService();
+        var components = new[]
+        {
+            TestData.CreateClassifiedComponent("valve-1", "Valves", "VL-100", "Valve A"),
+        };
+
+        var result = service.DiscoverFromComponents(components);
+
+        Assert.Contains("Valves", result.DiscoveredSections);
+        Assert.DoesNotContain(KnownBomSections.Pipes, result.DiscoveredSections);
+        Assert.DoesNotContain(KnownBomSections.Other, result.DiscoveredSections);
+    }
+
+    [Fact]
+    public void SuggestDefaultProfile_AddsCustomPrimaryFamilySectionProfiles()
+    {
+        var service = new PropertyDiscoveryService();
+        var components = new[]
+        {
+            TestData.CreateClassifiedComponent("valve-1", "Valves", "VL-100", "Valve A"),
+        };
+
+        var profile = service.SuggestDefaultProfile(components);
+
+        Assert.Contains(profile.SectionColumnProfiles, sectionProfile => string.Equals(sectionProfile.Section, "Valves", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(
+            ["BOMDesc", "Description", "Component Type"],
+            profile.GetSectionColumns("Valves").Select(column => column.DisplayName).ToArray());
+    }
 }

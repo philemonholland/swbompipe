@@ -4,6 +4,7 @@ public sealed class PropertyDiscoveryService
 {
     public PropertyDiscoveryResult DiscoverFromComponents(IEnumerable<ComponentRecord> components)
     {
+        var componentList = components.ToList();
         var propertyNames = components
             .SelectMany(component => component.Properties.Keys)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -14,11 +15,13 @@ public sealed class PropertyDiscoveryService
             .Where(propertyName => KnownPropertyNames.DefaultIgnoredProperties.Contains(propertyName, StringComparer.OrdinalIgnoreCase))
             .ToList();
 
-        var suggestedProfile = SuggestDefaultProfile(components);
+        var discoveredSections = DiscoverSections(componentList);
+        var suggestedProfile = SuggestDefaultProfile(componentList);
 
         return new PropertyDiscoveryResult
         {
             DiscoveredProperties = propertyNames,
+            DiscoveredSections = discoveredSections,
             SuggestedColumns = suggestedProfile.GetSectionColumns(KnownBomSections.Pipes),
             IgnoredProperties = ignoredProperties,
             Diagnostics = [],
@@ -32,9 +35,11 @@ public sealed class PropertyDiscoveryService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var discoveredSections = KnownBomSections.BuildConfigurableSections(DiscoverSections(components));
+
         var sectionProfiles = new List<BomSectionColumnProfile>();
 
-        foreach (var section in KnownBomSections.ConfigurableSections)
+        foreach (var section in discoveredSections)
         {
             var columns = KnownBomColumnProfiles.CreateDefaultSectionColumns(section)
                 .Where(column => propertyNames.Contains(column.SourceProperty))
@@ -85,6 +90,21 @@ public sealed class PropertyDiscoveryService
             AccessoryRules = accessoryRules,
             IgnoredProperties = KnownPropertyNames.DefaultIgnoredProperties.ToList(),
         };
+    }
+
+    private static IReadOnlyList<string> DiscoverSections(IEnumerable<ComponentRecord> components)
+    {
+        return components
+            .Select(component =>
+            {
+                var familyValue = component.GetPropertyValue(KnownPropertyNames.PrimaryFamily);
+                return string.IsNullOrWhiteSpace(familyValue)
+                    ? KnownBomSections.Other
+                    : KnownBomSections.NormalizeConfigurableSection(familyValue);
+            })
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(section => section, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static void AddAccessoryRule(

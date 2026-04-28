@@ -13,7 +13,7 @@ public sealed class XlsxBomExporter : IBomExporter
         var worksheet = workbook.AddWorksheet("BOM");
         var currentRow = 1;
 
-        foreach (var section in KnownBomSections.DisplayOrder)
+        foreach (var section in KnownBomSections.OrderSections(result.Rows.Select(row => row.Section)))
         {
             var sectionRows = result.Rows
                 .Where(row => string.Equals(row.Section, section, StringComparison.OrdinalIgnoreCase))

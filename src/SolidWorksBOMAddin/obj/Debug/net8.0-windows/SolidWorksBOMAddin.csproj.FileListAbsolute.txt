@@ -29,3 +29,15 @@ C:\codebase\bompipe\src\SolidWorksBOMAddin\obj\Debug\net8.0-windows\AFCA.PipingB
 C:\codebase\bompipe\src\SolidWorksBOMAddin\obj\Debug\net8.0-windows\SolidWorksBOMAddin.genruntimeconfig.cache
 C:\codebase\bompipe\src\SolidWorksBOMAddin\obj\Debug\net8.0-windows\ref\AFCA.PipingBom.Generator.dll
 C:\codebase\bompipe\src\SolidWorksBOMAddin\bin\Debug\net8.0-windows\profiles\default.pipebom.json
+C:\Users\gombo\AppData\Local\Temp\bompipe-live-build\profiles\default.pipebom.json
+C:\Users\gombo\AppData\Local\Temp\bompipe-live-build\AFCA.PipingBom.Generator.comhost.dll
+C:\Users\gombo\AppData\Local\Temp\bompipe-live-build\AFCA.PipingBom.Generator.deps.json
+C:\Users\gombo\AppData\Local\Temp\bompipe-live-build\AFCA.PipingBom.Generator.runtimeconfig.json
+C:\Users\gombo\AppData\Local\Temp\bompipe-live-build\AFCA.PipingBom.Generator.dll
+C:\Users\gombo\AppData\Local\Temp\bompipe-live-build\AFCA.PipingBom.Generator.pdb
+C:\Users\gombo\AppData\Local\Temp\bompipe-persistence-build\out\profiles\default.pipebom.json
+C:\Users\gombo\AppData\Local\Temp\bompipe-persistence-build\out\AFCA.PipingBom.Generator.comhost.dll
+C:\Users\gombo\AppData\Local\Temp\bompipe-persistence-build\out\AFCA.PipingBom.Generator.deps.json
+C:\Users\gombo\AppData\Local\Temp\bompipe-persistence-build\out\AFCA.PipingBom.Generator.runtimeconfig.json
+C:\Users\gombo\AppData\Local\Temp\bompipe-persistence-build\out\AFCA.PipingBom.Generator.dll
+C:\Users\gombo\AppData\Local\Temp\bompipe-persistence-build\out\AFCA.PipingBom.Generator.pdb

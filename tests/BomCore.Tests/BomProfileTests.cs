@@ -291,4 +291,33 @@ public sealed class BomProfileTests
         var pipeColumn = Assert.Single(profile.GetSectionColumns(KnownBomSections.Pipes));
         Assert.Equal(KnownPropertyNames.PipeLength, pipeColumn.SourceProperty);
     }
+
+    [Fact]
+    public void GetEffectiveConfigurableSections_IncludesCustomSectionsInStableOrder()
+    {
+        var profile = new BomProfile
+        {
+            SectionColumnProfiles =
+            [
+                new BomSectionColumnProfile
+                {
+                    Section = "Valves",
+                    Columns = KnownBomColumnProfiles.CreateDefaultSectionColumns("Valves"),
+                },
+            ],
+        };
+
+        var sections = profile.GetEffectiveConfigurableSections(["Instruments", "Supports", "Valves"]);
+
+        Assert.Equal(
+        [
+            KnownBomSections.Pipes,
+            KnownBomSections.Tubes,
+            KnownBomSections.Wires,
+            KnownBomSections.Instruments,
+            "Supports",
+            "Valves",
+            KnownBomSections.Other,
+        ], sections);
+    }
 }
