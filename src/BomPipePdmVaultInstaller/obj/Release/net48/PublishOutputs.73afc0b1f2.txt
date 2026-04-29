@@ -1,4 +1,0 @@
-C:\Users\gombo\AppData\Local\AFCA\BOMPipe\BomPipePdmVaultInstaller\BomPipePdmVaultInstaller.exe
-C:\Users\gombo\AppData\Local\AFCA\BOMPipe\BomPipePdmVaultInstaller\BomPipePdmVaultInstaller.exe.config
-C:\Users\gombo\AppData\Local\AFCA\BOMPipe\BomPipePdmVaultInstaller\BomPipePdmVaultInstaller.pdb
-C:\Users\gombo\AppData\Local\AFCA\BOMPipe\BomPipePdmVaultInstaller\EPDM.Interop.epdm.dll
