@@ -52,11 +52,13 @@ try {
     New-Item -Path $exportsRoot -ItemType Directory -Force | Out-Null
 
     $outputPath = Join-Path $exportsRoot "$fileStem.$timestamp.xlsx"
+    $bomDbOutputPath = Join-Path $exportsRoot "$fileStem.$timestamp.bomdb.json"
     $debugReportPath = Join-Path $exportsRoot "$fileStem.$timestamp.debug.json"
     $arguments = @(
         '--assembly', $AssemblyPath,
         '--format', 'xlsx',
         '--output', $outputPath,
+        '--bomdb-output', $bomDbOutputPath,
         '--debug-report', $debugReportPath
     )
 
@@ -75,7 +77,7 @@ try {
         throw "BOMPipe exited with code $LASTEXITCODE.`n$commandOutput"
     }
 
-    $message = "BOM exported to:`n$outputPath`n`nDebug report:`n$debugReportPath"
+    $message = "BOM exported to:`n$outputPath`n`nBOMDB import JSON:`n$bomDbOutputPath`n`nDebug report:`n$debugReportPath"
     [System.Windows.Forms.MessageBox]::Show(
         $message,
         'BOMPipe',

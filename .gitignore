@@ -1,0 +1,26 @@
+# Build outputs
+**/bin/
+**/obj/
+**/TestResults/
+/artifacts/
+
+# IDE and user-specific state
+/.vs/
+/.idea/
+/.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.trx
+
+# Local exports and validation artifacts
+*.bom.csv
+*.bom.xlsx
+*.bomdb.json
+*.debug.json
+/exports/
+/Exports/
+
+# Logs
+*.log

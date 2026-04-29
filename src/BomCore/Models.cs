@@ -326,6 +326,9 @@ public sealed record AssemblyReadResult
 {
     public string? AssemblyPath { get; init; }
 
+    public IReadOnlyDictionary<string, string?> AssemblyCustomProperties { get; init; } =
+        new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
     public IReadOnlyList<ComponentRecord> Components { get; init; } = [];
 
     public int ComponentsScanned { get; init; }

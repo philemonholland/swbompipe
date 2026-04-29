@@ -66,7 +66,8 @@ internal static class SolidWorksPropertyExtractor
                 out _,
                 out _);
 
-            properties.TryAdd(
+            AddOrReplaceBlankValue(
+                properties,
                 propertyName,
                 new PropertyValue
                 {
@@ -76,6 +77,24 @@ internal static class SolidWorksPropertyExtractor
                     Scope = scope,
                     Source = source,
                 });
+        }
+    }
+
+    private static void AddOrReplaceBlankValue(
+        IDictionary<string, PropertyValue> properties,
+        string propertyName,
+        PropertyValue propertyValue)
+    {
+        if (!properties.TryGetValue(propertyName, out var existingValue))
+        {
+            properties[propertyName] = propertyValue;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(existingValue.EffectiveValue)
+            && !string.IsNullOrWhiteSpace(propertyValue.EffectiveValue))
+        {
+            properties[propertyName] = propertyValue;
         }
     }
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository is the scaffold for **AFCA Piping BOM Generator**, a SolidWorks BOM tool that reads piping assembly properties, applies a persistent JSON mapping profile, groups BOM rows, and exports CSV/XLSX output.
+This repository is the scaffold for **AFCA Piping BOM Generator**, a SolidWorks BOM tool that reads piping assembly properties, applies a persistent JSON mapping profile, groups BOM rows, and exports human-facing CSV/XLSX output plus the BOMDB import JSON handoff.
 
 ## Top-level layout
 
@@ -48,7 +48,9 @@ This boundary also covers non-embedded entry points. The product is expected to 
 - starting SolidWorks through COM when launched from Explorer or the PDM add-in
 - opening an assembly in the background
 - reusing the SolidWorks adapter layer to read components
-- loading the effective BOM profile and exporting CSV/XLSX output
+- loading the effective BOM profile and exporting CSV/XLSX output or the BOMDB import JSON file
+
+For operator workflows, treat the `.bomdb.json` file as the authoritative downstream handoff to BOMDB. CSV and XLSX remain review-friendly exports for people, and BOMDB import may happen later on a different machine that does not run SolidWorks.
 
 It should stay thin and delegate BOM rules to `BomCore` and SolidWorks object translation to the adapter project.
 
@@ -69,6 +71,7 @@ It should stay thin and delegate BOM rules to `BomCore` and SolidWorks object tr
 3. Adapter code resolves properties and produces core-friendly records.
 4. `BomCore` classifies parts, applies the active profile, groups rows, and emits diagnostics.
 5. Exporters or UI consume the resulting BOM sections.
+6. Operators hand the `.bomdb.json` file to BOMDB, while CSV/XLSX stay available for human review.
 
 ## Profile boundary
 

@@ -28,12 +28,18 @@ public sealed class SolidWorksAssemblyReader : IAssemblyReader
 
         var activeConfiguration = activeDocument.ConfigurationManager?.ActiveConfiguration
             ?? throw new InvalidOperationException("The active assembly has no active configuration.");
+        var assemblyCustomProperties = ToExportProperties(
+            SolidWorksPropertyExtractor.ReadProperties(
+                component: null,
+                modelDocument: activeDocument,
+                configurationName: activeConfiguration.Name));
         var rootComponent = activeConfiguration.GetRootComponent3(_options.ResolveLightweightComponents);
         if (rootComponent is null)
         {
             return new AssemblyReadResult
             {
                 AssemblyPath = activeDocument.GetPathName(),
+                AssemblyCustomProperties = assemblyCustomProperties,
                 Components = [],
                 ComponentsScanned = 0,
                 ComponentsSkipped = 0,
@@ -54,6 +60,7 @@ public sealed class SolidWorksAssemblyReader : IAssemblyReader
         return new AssemblyReadResult
         {
             AssemblyPath = activeDocument.GetPathName(),
+            AssemblyCustomProperties = assemblyCustomProperties,
             Components = components,
             ComponentsScanned = scannedCount,
             ComponentsSkipped = skippedCount,
@@ -153,5 +160,16 @@ public sealed class SolidWorksAssemblyReader : IAssemblyReader
             IComponent2 singleComponent => [singleComponent],
             _ => [],
         };
+    }
+
+    private static IReadOnlyDictionary<string, string?> ToExportProperties(
+        IReadOnlyDictionary<string, PropertyValue> properties)
+    {
+        return properties
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value.EffectiveValue))
+            .ToDictionary(
+                pair => pair.Key,
+                pair => (string?)pair.Value.EffectiveValue.Trim(),
+                StringComparer.OrdinalIgnoreCase);
     }
 }

@@ -19,6 +19,23 @@ internal sealed class BomPreviewShellForm : Form
     private static readonly Color ShellGridLineColor = Color.FromArgb(214, 207, 190);
     private static readonly Color ShellTextColor = Color.FromArgb(30, 34, 32);
     private static readonly Color ShellMutedTextColor = Color.FromArgb(89, 92, 86);
+    private static readonly string[] ProjectPropertyCandidates =
+    [
+        "project",
+        "Project",
+        "Project Number",
+        "Project No",
+        "Project No.",
+        "Project #",
+    ];
+    private static readonly string[] ProjectNamePropertyCandidates =
+    [
+        "project_name",
+        "Project Name",
+        "ProjectName",
+        "Project_Name",
+        "Project Description",
+    ];
 
     private readonly BomPipeAddin _addin;
     private readonly ProfileStore _profileStore = new();
@@ -43,16 +60,23 @@ internal sealed class BomPreviewShellForm : Form
     private readonly Label _summaryLabel;
     private readonly Label _profileLabel;
     private readonly Label _familyLabel;
+    private readonly TextBox _projectTextBox;
+    private readonly TextBox _projectNameTextBox;
+    private readonly Label _assemblyPathLabel;
+    private readonly Label _buildInfoLabel;
     private readonly Label _statusLabel;
     private readonly TabControl _tabControl;
     private readonly SolidWorksKeyboardMessageFilter _keyboardMessageFilter;
     private readonly SolidWorksMainWindowKeyboardInterceptor _solidWorksKeyboardInterceptor;
     private readonly SolidWorksPreTranslateKeyboardHook _preTranslateKeyboardHook;
+    private readonly BomPipeBuildInfo _buildInfo;
 
     private IReadOnlyList<ComponentRecord> _scannedComponents = [];
     private IReadOnlyList<BomDiagnostic> _profileDiagnostics = [];
     private BomProfile _currentProfile = new();
     private string? _assemblyPath;
+    private IReadOnlyDictionary<string, string?> _assemblyCustomProperties =
+        new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
     private string? _assemblyDisplayName;
     private string? _profileSourcePath;
     private string? _externalSettingsPath;
@@ -64,6 +88,7 @@ internal sealed class BomPreviewShellForm : Form
     private bool _keyboardActivationScheduled;
     private bool _isEnsuringKeyboardActivation;
     private Control? _scheduledKeyboardTarget;
+    private bool _buildInfoWarningShown;
 
     public BomPreviewShellForm(BomPipeAddin addin)
     {
@@ -71,8 +96,9 @@ internal sealed class BomPreviewShellForm : Form
         _keyboardMessageFilter = new SolidWorksKeyboardMessageFilter(this);
         _solidWorksKeyboardInterceptor = new SolidWorksMainWindowKeyboardInterceptor(this);
         _preTranslateKeyboardHook = new SolidWorksPreTranslateKeyboardHook(this);
+        _buildInfo = BomPipeBuildInfo.Load();
 
-        Text = "BOMPipe Mapping Workspace";
+        Text = "BOMPipe Manager";
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = ShellBackColor;
         Font = new Font("Segoe UI", 9F);
@@ -84,7 +110,7 @@ internal sealed class BomPreviewShellForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4,
+            RowCount = 5,
             Padding = new Padding(12),
             BackColor = ShellBackColor,
         };
@@ -116,21 +142,55 @@ internal sealed class BomPreviewShellForm : Form
             CreateActionButton("Export Settings", (_, _) => ExportSettings())));
         commandPanel.Controls.Add(CreateCommandGroup(
             "Preview / Export",
-            CreateActionButton("Refresh Preview", (_, _) => RefreshMappingPreview()),
-            CreateActionButton("Generate Preview", (_, _) => GenerateBomPreview(), accent: true),
-            CreateActionButton("Export CSV", (_, _) => ExportBom("csv")),
-            CreateActionButton("Export Excel", (_, _) => ExportBom("xlsx"))));
+            CreatePreviewExportButtons()));
 
         var infoPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 3,
+            RowCount = 4,
             AutoSize = true,
             Padding = new Padding(12),
             Margin = new Padding(0, 0, 0, 10),
             BackColor = ShellHeaderColor,
         };
+
+        var projectPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 4,
+            RowCount = 2,
+            AutoSize = true,
+            BackColor = ShellHeaderColor,
+            Margin = new Padding(0, 0, 0, 8),
+        };
+        projectPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        projectPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F));
+        projectPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        projectPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62F));
+
+        _projectTextBox = CreateHeaderTextBox();
+        _projectNameTextBox = CreateHeaderTextBox();
+        _assemblyPathLabel = new Label
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            ForeColor = Color.FromArgb(209, 219, 203),
+            Text = "Assembly path: (scan an assembly)",
+        };
+        _buildInfoLabel = new Label
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            ForeColor = Color.FromArgb(209, 219, 203),
+            Text = _buildInfo.DisplayText,
+        };
+        projectPanel.Controls.Add(CreateHeaderFieldLabel("Project"), 0, 0);
+        projectPanel.Controls.Add(_projectTextBox, 1, 0);
+        projectPanel.Controls.Add(CreateHeaderFieldLabel("Project Name"), 2, 0);
+        projectPanel.Controls.Add(_projectNameTextBox, 3, 0);
+        projectPanel.Controls.Add(_assemblyPathLabel, 0, 1);
+        projectPanel.SetColumnSpan(_assemblyPathLabel, 4);
 
         _summaryLabel = new Label
         {
@@ -154,9 +214,11 @@ internal sealed class BomPreviewShellForm : Form
             ForeColor = Color.FromArgb(209, 219, 203),
             Text = "Detected Primary Family sections: (scan an assembly to populate)",
         };
-        infoPanel.Controls.Add(_summaryLabel, 0, 0);
-        infoPanel.Controls.Add(_profileLabel, 0, 1);
-        infoPanel.Controls.Add(_familyLabel, 0, 2);
+        infoPanel.Controls.Add(projectPanel, 0, 0);
+        infoPanel.Controls.Add(_summaryLabel, 0, 1);
+        infoPanel.Controls.Add(_profileLabel, 0, 2);
+        infoPanel.Controls.Add(_familyLabel, 0, 3);
+        infoPanel.Controls.Add(_buildInfoLabel, 0, 4);
 
         _tabControl = new TabControl
         {
@@ -216,6 +278,23 @@ internal sealed class BomPreviewShellForm : Form
         base.OnShown(e);
         EnsureSolidWorksKeyboardInterceptor();
         ScheduleKeyboardActivation();
+        ShowBuildInfoWarningIfNeeded();
+    }
+
+    private void ShowBuildInfoWarningIfNeeded()
+    {
+        if (_buildInfoWarningShown || _buildInfo.IsVerified)
+        {
+            return;
+        }
+
+        _buildInfoWarningShown = true;
+        MessageBox.Show(
+            this,
+            "This BOMPipe Manager build is missing its install manifest. Reinstall BOMPipe from the current source before validating UI or export changes.",
+            Text,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
     }
 
     protected override void OnActivated(EventArgs e)
@@ -448,6 +527,41 @@ internal sealed class BomPreviewShellForm : Form
         button.FlatAppearance.MouseOverBackColor = accent ? ShellAccentDarkColor : Color.FromArgb(247, 241, 226);
         button.Click += onClick;
         return button;
+    }
+
+    private static Label CreateHeaderFieldLabel(string text)
+    {
+        return new Label
+        {
+            AutoSize = true,
+            Margin = new Padding(0, 3, 6, 3),
+            ForeColor = Color.FromArgb(224, 230, 219),
+            Text = text,
+        };
+    }
+
+    private static TextBox CreateHeaderTextBox()
+    {
+        return new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 0, 12, 6),
+            BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Color.White,
+            ForeColor = ShellTextColor,
+        };
+    }
+
+    private Control[] CreatePreviewExportButtons(bool bomDbAccent = false)
+    {
+        return
+        [
+            CreateActionButton("Refresh Preview", (_, _) => RefreshMappingPreview()),
+            CreateActionButton("Generate Preview", (_, _) => GenerateBomPreview(), accent: true),
+            CreateActionButton("Export CSV", (_, _) => ExportBom(BomExportFormats.Csv)),
+            CreateActionButton("Export Excel", (_, _) => ExportBom(BomExportFormats.Xlsx)),
+            CreateActionButton("Export BOMDB JSON", (_, _) => ExportBom(BomExportFormats.BomDbJson), accent: bomDbAccent),
+        ];
     }
 
     private static GroupBox CreateCommandGroup(string title, params Control[] controls)
@@ -891,7 +1005,7 @@ internal sealed class BomPreviewShellForm : Form
         centerCommands.BackColor = ShellBackColor;
         centerCommands.Controls.Add(CreateActionButton("Add Discovered Column", (_, _) => AddSelectedDiscoveredProperty()));
         centerCommands.Controls.Add(CreateActionButton("Remove Selected Column", (_, _) => RemoveSelectedSectionColumn()));
-        centerCommands.Controls.Add(CreateActionButton("Refresh Preview", (_, _) => RefreshMappingPreview(), accent: true));
+        centerCommands.Controls.AddRange(CreatePreviewExportButtons(bomDbAccent: true));
         centerCommands.Controls.Add(CreateActionButton("Import Settings", (_, _) => ImportSettings()));
         centerCommands.Controls.Add(CreateActionButton("Export Settings", (_, _) => ExportSettings()));
         centerCommands.Controls.Add(CreateActionButton("Save Mapping Profile", (_, _) => SaveMapping()));
@@ -1017,12 +1131,14 @@ internal sealed class BomPreviewShellForm : Form
             _scannedComponents = assemblyReadResult.Components;
             _componentsScanned = assemblyReadResult.ComponentsScanned;
             _componentsSkipped = assemblyReadResult.ComponentsSkipped;
+            _assemblyCustomProperties = assemblyReadResult.AssemblyCustomProperties;
             _assemblyPath = string.IsNullOrWhiteSpace(assemblyReadResult.AssemblyPath)
                 ? (string.IsNullOrWhiteSpace(activeDocument.GetPathName()) ? null : activeDocument.GetPathName())
                 : assemblyReadResult.AssemblyPath;
             _assemblyDisplayName = !string.IsNullOrWhiteSpace(_assemblyPath)
                 ? Path.GetFileName(_assemblyPath)
                 : activeDocument.GetTitle();
+            PopulateProjectMetadataFields(overwriteExisting: true);
 
             var profileLoadResult = LoadEffectiveProfile(_assemblyPath);
             _currentProfile = profileLoadResult.Profile;
@@ -1046,6 +1162,96 @@ internal sealed class BomPreviewShellForm : Form
         }
     }
 
+    private void RefreshProjectMetadataFromActiveAssembly(bool overwriteExisting)
+    {
+        var application = _addin.RequireApplication();
+        var activeDocument = application.IActiveDoc2;
+        if (activeDocument is not IAssemblyDoc)
+        {
+            return;
+        }
+
+        var activeConfiguration = activeDocument.ConfigurationManager?.ActiveConfiguration;
+        if (activeConfiguration is null)
+        {
+            return;
+        }
+
+        var freshProperties = ToExportProperties(
+            SolidWorksPropertyExtractor.ReadProperties(
+                component: null,
+                modelDocument: activeDocument,
+                configurationName: activeConfiguration.Name));
+        if (freshProperties.Count > 0)
+        {
+            _assemblyCustomProperties = freshProperties;
+        }
+
+        var activePath = activeDocument.GetPathName();
+        if (!string.IsNullOrWhiteSpace(activePath))
+        {
+            _assemblyPath = activePath;
+            _assemblyDisplayName = Path.GetFileName(activePath);
+        }
+
+        PopulateProjectMetadataFields(overwriteExisting);
+    }
+
+    private void PopulateProjectMetadataFields(bool overwriteExisting)
+    {
+        SetMetadataTextBox(_projectTextBox, FindAssemblyMetadata(ProjectPropertyCandidates), overwriteExisting);
+        SetMetadataTextBox(_projectNameTextBox, FindAssemblyMetadata(ProjectNamePropertyCandidates), overwriteExisting);
+        _assemblyPathLabel.Text = $"Assembly path: {_assemblyPath ?? "(not scanned)"}";
+    }
+
+    private static void SetMetadataTextBox(TextBox textBox, string? value, bool overwriteExisting)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (overwriteExisting || string.IsNullOrWhiteSpace(textBox.Text))
+        {
+            textBox.Text = value.Trim();
+        }
+    }
+
+    private string? FindAssemblyMetadata(IEnumerable<string> candidates)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (_assemblyCustomProperties.TryGetValue(candidate, out var value)
+                && !string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        foreach (var candidate in candidates)
+        {
+            var match = _assemblyCustomProperties.FirstOrDefault(
+                pair => string.Equals(pair.Key, candidate, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(match.Value))
+            {
+                return match.Value.Trim();
+            }
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyDictionary<string, string?> ToExportProperties(
+        IReadOnlyDictionary<string, PropertyValue> properties)
+    {
+        return properties
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value.EffectiveValue))
+            .ToDictionary(
+                pair => pair.Key,
+                pair => (string?)pair.Value.EffectiveValue.Trim(),
+                StringComparer.OrdinalIgnoreCase);
+    }
+
     private void ShowMappingTab()
     {
         SyncVisibleSections(_currentProfile, discovery: null);
@@ -1066,6 +1272,8 @@ internal sealed class BomPreviewShellForm : Form
                     return;
                 }
             }
+
+            RefreshProjectMetadataFromActiveAssembly(overwriteExisting: false);
 
             var profile = BuildProfileFromEditor();
             var result = _bomGenerator.Generate(_scannedComponents, profile);
@@ -1099,21 +1307,23 @@ internal sealed class BomPreviewShellForm : Form
                 }
             }
 
+            RefreshProjectMetadataFromActiveAssembly(overwriteExisting: false);
+
             var profile = BuildProfileFromEditor();
             var result = _bomGenerator.Generate(_scannedComponents, profile);
             var diagnostics = _profileDiagnostics.Concat(result.Diagnostics).ToList();
+            var normalizedFormat = BomExportFormats.Normalize(format);
+            var exportAssemblyProperties = BuildAssemblyCustomPropertiesForExport(normalizedFormat);
 
             using var dialog = new SaveFileDialog
             {
                 AddExtension = true,
-                DefaultExt = format,
-                Filter = string.Equals(format, "xlsx", StringComparison.OrdinalIgnoreCase)
-                    ? "Excel Workbook (*.xlsx)|*.xlsx"
-                    : "CSV (*.csv)|*.csv",
-                FileName = BuildDefaultExportFileName(format),
+                DefaultExt = BomExportFormats.GetDefaultExtension(normalizedFormat).TrimStart('.'),
+                Filter = BuildExportFileFilter(normalizedFormat),
+                FileName = BuildDefaultExportFileName(normalizedFormat),
                 InitialDirectory = ResolveInitialExportDirectory(),
                 OverwritePrompt = true,
-                Title = string.Equals(format, "xlsx", StringComparison.OrdinalIgnoreCase) ? "Export BOM Preview to Excel" : "Export BOM Preview to CSV",
+                Title = BuildExportDialogTitle(normalizedFormat),
             };
 
             if (dialog.ShowDialog(this) != DialogResult.OK)
@@ -1123,12 +1333,22 @@ internal sealed class BomPreviewShellForm : Form
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(dialog.FileName)!);
+            var exportResult = new BomResult
+            {
+                Rows = result.Rows,
+                Diagnostics = diagnostics,
+            };
+
             using var stream = File.Create(dialog.FileName);
-            CreateExporter(format).Export(
-                new BomResult
+            new BomFileExportService().Export(
+                new BomFileExportRequest
                 {
-                    Rows = result.Rows,
-                    Diagnostics = diagnostics,
+                    Format = normalizedFormat,
+                    AssemblyPath = _assemblyPath,
+                    AssemblyCustomProperties = exportAssemblyProperties,
+                    ProfilePath = _profileSourcePath,
+                    Profile = profile,
+                    Result = exportResult,
                 },
                 stream);
 
@@ -1137,12 +1357,41 @@ internal sealed class BomPreviewShellForm : Form
             BindMappingPreview(result);
             BindMappingDiagnostics(diagnostics);
             _tabControl.SelectedTab = _tabControl.TabPages["PreviewTab"] ?? _tabControl.TabPages[2];
-            SetStatus($"Exported {result.Rows.Count} BOM row(s) to {dialog.FileName}.");
+            SetStatus($"Exported {BomExportFormats.GetDisplayName(normalizedFormat)} containing {result.Rows.Count} BOM row(s) to {dialog.FileName}.");
         }
         catch (Exception ex)
         {
             ShowError(ex.Message);
         }
+    }
+
+    private IReadOnlyDictionary<string, string?> BuildAssemblyCustomPropertiesForExport(string normalizedFormat)
+    {
+        var properties = new Dictionary<string, string?>(
+            _assemblyCustomProperties,
+            StringComparer.OrdinalIgnoreCase);
+        var project = _projectTextBox.Text.Trim();
+        var projectName = _projectNameTextBox.Text.Trim();
+
+        if (normalizedFormat == BomExportFormats.BomDbJson && string.IsNullOrWhiteSpace(project))
+        {
+            throw new InvalidOperationException(
+                "Project is required for BOMDB import. Enter the Project value or add it to the main assembly custom properties.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(project))
+        {
+            properties["Project"] = project;
+            properties["project"] = project;
+        }
+
+        if (!string.IsNullOrWhiteSpace(projectName))
+        {
+            properties["Project Name"] = projectName;
+            properties["project_name"] = projectName;
+        }
+
+        return properties;
     }
 
     private void SaveMapping()
@@ -1458,6 +1707,7 @@ internal sealed class BomPreviewShellForm : Form
             : _externalSettingsPath;
         _profileLabel.Text = $"Profile: {_profileSourcePath ?? "Built-in default"} | Settings file: {settingsText} | Sections: {string.Join(", ", _visibleConfigurableSections)}";
         _familyLabel.Text = $"Detected Primary Family sections: {BuildDetectedSectionsSummary()}";
+        _assemblyPathLabel.Text = $"Assembly path: {_assemblyPath ?? "(not scanned)"}";
     }
 
     private string BuildDetectedSectionsSummary()
@@ -1935,7 +2185,7 @@ internal sealed class BomPreviewShellForm : Form
             ? Path.GetFileNameWithoutExtension(_assemblyPath)
             : (!string.IsNullOrWhiteSpace(_assemblyDisplayName) ? Path.GetFileNameWithoutExtension(_assemblyDisplayName) : "pipe-bom-preview");
 
-        return $"{SanitizeFileName(baseName)}.bom.{format}";
+        return $"{SanitizeFileName(baseName)}{BomExportFormats.GetDefaultFileSuffix(format)}";
     }
 
     private string ResolveInitialExportDirectory()
@@ -2028,11 +2278,26 @@ internal sealed class BomPreviewShellForm : Form
             "settings-file.path");
     }
 
-    private static IBomExporter CreateExporter(string format)
+    private static string BuildExportDialogTitle(string format)
     {
-        return string.Equals(format, "xlsx", StringComparison.OrdinalIgnoreCase)
-            ? new XlsxBomExporter()
-            : new CsvBomExporter();
+        return BomExportFormats.Normalize(format) switch
+        {
+            BomExportFormats.Csv => "Export BOM Preview to CSV",
+            BomExportFormats.Xlsx => "Export BOM Preview to Excel",
+            BomExportFormats.BomDbJson => "Export BOMDB Import JSON",
+            _ => throw new InvalidOperationException("Unsupported BOM export format."),
+        };
+    }
+
+    private static string BuildExportFileFilter(string format)
+    {
+        return BomExportFormats.Normalize(format) switch
+        {
+            BomExportFormats.Csv => "CSV (*.csv)|*.csv",
+            BomExportFormats.Xlsx => "Excel Workbook (*.xlsx)|*.xlsx",
+            BomExportFormats.BomDbJson => "BOMDB Import JSON (*.bomdb.json)|*.bomdb.json|JSON (*.json)|*.json",
+            _ => throw new InvalidOperationException("Unsupported BOM export format."),
+        };
     }
 
     private static IReadOnlyList<string> CollectHeaders(IEnumerable<BomRow> rows)

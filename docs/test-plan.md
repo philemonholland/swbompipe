@@ -18,6 +18,7 @@ Planned unit-test focus areas:
 - ignored-property handling for gasket and ferrule helper fields
 - accessory-row generation from `NumGaskets` and `NumClamps`
 - export formatting and diagnostic propagation
+- BOMDB JSON export formatting for downstream import
 
 These tests should not depend on SolidWorks interop or a local assembly file.
 
@@ -52,10 +53,11 @@ Planned checks against that assembly:
 2. read a known pipe part and confirm expected properties are visible
 3. scan the full assembly and confirm pipe cuts stay separated by length
 4. confirm accessory quantities are multiplied by grouped pipe quantity
-5. export CSV/XLSX and inspect the resulting sections
-6. invoke the launcher against the same assembly and confirm it can export without a manually opened SolidWorks session
-7. install BOMPipe and confirm it appears in the SolidWorks Add-Ins dialog
-8. confirm the PDM Professional right-click menu exposes the BOMPipe command for the same assembly
+5. export CSV/XLSX for human review and export `.bomdb.json` for BOMDB import
+6. confirm the `.bomdb.json` file is the artifact handed to BOMDB, while CSV/XLSX remain operator-facing outputs
+7. invoke the launcher against the same assembly and confirm it can export without a manually opened SolidWorks session
+8. install BOMPipe and confirm it appears in the SolidWorks Add-Ins dialog
+9. confirm the PDM Professional right-click menu exposes the BOMPipe command for the same assembly and produces `.xlsx` + `.bomdb.json` + `.debug.json`
 
 ## Environment note
 

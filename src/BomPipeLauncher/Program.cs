@@ -68,20 +68,42 @@ static int Run(string[] args)
             .Concat(bomResult.Diagnostics)
             .ToList();
         var outputPath = ResolveOutputPath(options);
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        EnsureDistinctOutputPaths(outputPath, options.BomDbOutputPath);
 
-        using var outputStream = File.Create(outputPath);
-        CreateExporter(options.Format).Export(
-            new BomResult
-            {
-                Rows = bomResult.Rows,
-                Diagnostics = combinedDiagnostics,
-            },
-            outputStream);
+        var exportResult = new BomResult
+        {
+            Rows = bomResult.Rows,
+            Diagnostics = combinedDiagnostics,
+        };
+
+        var exportRequest = new BomFileExportRequest
+        {
+            Format = options.Format,
+            AssemblyPath = assemblyReadResult.AssemblyPath ?? options.AssemblyPath,
+            AssemblyCustomProperties = assemblyReadResult.AssemblyCustomProperties,
+            ProfilePath = profileLoadResult.SourcePath,
+            Profile = profileLoadResult.Profile,
+            Result = exportResult,
+        };
+
+        var fileExportService = new BomFileExportService();
+        ExportBomFile(fileExportService, exportRequest, outputPath);
+        if (!string.IsNullOrWhiteSpace(options.BomDbOutputPath))
+        {
+            ExportBomFile(
+                fileExportService,
+                exportRequest with { Format = BomExportFormats.BomDbJson },
+                options.BomDbOutputPath!);
+        }
 
         ExportDebugReportIfRequested(options, profileLoadResult, assemblyReadResult, bomResult, combinedDiagnostics);
 
-        Console.WriteLine($"Exported {bomResult.Rows.Count} BOM row(s) to {outputPath}");
+        Console.WriteLine($"Exported {BomExportFormats.GetDisplayName(options.Format)} containing {bomResult.Rows.Count} BOM row(s) to {outputPath}");
+        if (!string.IsNullOrWhiteSpace(options.BomDbOutputPath))
+        {
+            Console.WriteLine($"Exported {BomExportFormats.GetDisplayName(BomExportFormats.BomDbJson)} containing {bomResult.Rows.Count} BOM row(s) to {options.BomDbOutputPath}");
+        }
+
         foreach (var diagnostic in combinedDiagnostics)
         {
             Console.WriteLine($"[{diagnostic.Severity}] {diagnostic.Code}: {diagnostic.Message}");
@@ -188,11 +210,16 @@ static ProfileLoadResult LoadProfile(LauncherOptions options, ProfileStore store
         });
 }
 
-static IBomExporter CreateExporter(string format)
+static void ExportBomFile(BomFileExportService fileExportService, BomFileExportRequest request, string outputPath)
 {
-    return string.Equals(format, "xlsx", StringComparison.OrdinalIgnoreCase)
-        ? new XlsxBomExporter()
-        : new CsvBomExporter();
+    var directory = Path.GetDirectoryName(outputPath);
+    if (!string.IsNullOrWhiteSpace(directory))
+    {
+        Directory.CreateDirectory(directory);
+    }
+
+    using var outputStream = File.Create(outputPath);
+    fileExportService.Export(request, outputStream);
 }
 
 static void ExportDebugReportIfRequested(
@@ -235,6 +262,22 @@ static void ExportDebugReportIfRequested(
     Console.WriteLine($"Exported debug report to {debugReportPath}");
 }
 
+static void EnsureDistinctOutputPaths(string primaryOutputPath, string? bomDbOutputPath)
+{
+    if (string.IsNullOrWhiteSpace(bomDbOutputPath))
+    {
+        return;
+    }
+
+    if (string.Equals(
+            Path.GetFullPath(primaryOutputPath),
+            Path.GetFullPath(bomDbOutputPath),
+            StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("Primary output path and --bomdb-output must be different files.");
+    }
+}
+
 static string ResolveOutputPath(LauncherOptions options)
 {
     if (!string.IsNullOrWhiteSpace(options.OutputPath))
@@ -244,6 +287,5 @@ static string ResolveOutputPath(LauncherOptions options)
 
     var directory = Path.GetDirectoryName(options.AssemblyPath) ?? System.Environment.CurrentDirectory;
     var baseName = Path.GetFileNameWithoutExtension(options.AssemblyPath);
-    var extension = string.Equals(options.Format, "xlsx", StringComparison.OrdinalIgnoreCase) ? ".xlsx" : ".csv";
-    return Path.Combine(directory, $"{baseName}.bom{extension}");
+    return Path.Combine(directory, $"{baseName}{BomExportFormats.GetDefaultFileSuffix(options.Format)}");
 }

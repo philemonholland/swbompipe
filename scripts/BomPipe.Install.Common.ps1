@@ -56,7 +56,65 @@ function Get-BomPipeDotNetPath {
         return $dotnetCommand.Source
     }
 
-    throw 'dotnet.exe was not found. Install the .NET SDK or build the solution first so the installer can reuse existing outputs.'
+    throw 'dotnet.exe was not found. Install the .NET SDK so BOMPipe can publish the current source during installation.'
+}
+
+function Get-BomPipeSourceRevision {
+    $repoRoot = Get-BomPipeRepoRoot
+    $gitCommand = Get-Command git -ErrorAction SilentlyContinue
+    if (-not $gitCommand) {
+        return 'git-unavailable'
+    }
+
+    $revision = (& $gitCommand.Source -C $repoRoot rev-parse --short=12 HEAD 2>$null | Out-String).Trim()
+    if ([string]::IsNullOrWhiteSpace($revision)) {
+        return 'unknown'
+    }
+
+    $status = (& $gitCommand.Source -C $repoRoot status --short 2>$null | Out-String).Trim()
+    if (-not [string]::IsNullOrWhiteSpace($status)) {
+        return "$revision-dirty"
+    }
+
+    return $revision
+}
+
+function Write-BomPipeBuildManifest {
+    param(
+        [Parameter(Mandatory)]
+        [string]$InstallRoot,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('Debug', 'Release')]
+        [string]$Configuration,
+
+        [Parameter(Mandatory)]
+        [object[]]$PayloadTargets
+    )
+
+    $manifest = [ordered]@{
+        product = 'BOMPipe'
+        configuration = $Configuration
+        installed_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+        source_root = Get-BomPipeRepoRoot
+        source_revision = Get-BomPipeSourceRevision
+        machine = $env:COMPUTERNAME
+        user = [Environment]::UserName
+    }
+    $json = $manifest | ConvertTo-Json -Depth 3
+    $manifestFileName = 'bompipe-build-info.json'
+    $manifestPaths = @((Join-Path $InstallRoot $manifestFileName))
+    foreach ($payloadTarget in $PayloadTargets) {
+        $manifestPaths += (Join-Path $payloadTarget.Target $manifestFileName)
+    }
+
+    foreach ($path in $manifestPaths) {
+        $parent = Split-Path -Parent $path
+        New-Item -Path $parent -ItemType Directory -Force | Out-Null
+        Set-Content -Path $path -Value $json -Encoding UTF8
+    }
+
+    Write-Host ("BOMPipe build manifest written: {0} ({1})" -f $manifest.source_revision, $manifest.installed_at_utc)
 }
 
 function Initialize-BomPipeDirectory {
@@ -110,10 +168,10 @@ function Publish-BomPipeProject {
         [string]$Configuration
     )
 
-    Initialize-BomPipeDirectory -Path $OutputPath
-
     $dotnet = Get-BomPipeDotNetPath
     $projectPath = Join-Path (Get-BomPipeRepoRoot) (Get-BomPipeProjectRelativePath -ProjectName $ProjectName)
+
+    Initialize-BomPipeDirectory -Path $OutputPath
 
     & $dotnet publish $projectPath -c $Configuration -o $OutputPath --nologo
     if ($LASTEXITCODE -ne 0) {
@@ -133,6 +191,9 @@ function Install-BomPipePayload {
         [switch]$ForceRebuild
     )
 
+    $dotnet = Get-BomPipeDotNetPath
+    Write-Host "Using .NET SDK host: $dotnet"
+
     $payloadTargets = @(
         @{ Project = 'BomPipeLauncher'; Target = Join-Path $InstallRoot 'BomPipeLauncher' },
         @{ Project = 'SolidWorksBOMAddin'; Target = Join-Path $InstallRoot 'SolidWorksBOMAddin' },
@@ -150,19 +211,13 @@ function Install-BomPipePayload {
     New-Item -Path $InstallRoot -ItemType Directory -Force | Out-Null
 
     foreach ($payloadTarget in $payloadTargets) {
-        $sourcePath = Get-BomPipeBuildOutputPath -ProjectName $payloadTarget.Project -Configuration $Configuration
-
-        if ($ForceRebuild -or -not (Test-Path $sourcePath)) {
-            Publish-BomPipeProject -ProjectName $payloadTarget.Project -OutputPath $payloadTarget.Target -Configuration $Configuration
-        }
-        else {
-            Copy-BomPipePayload -SourcePath $sourcePath -DestinationPath $payloadTarget.Target
-        }
+        Publish-BomPipeProject -ProjectName $payloadTarget.Project -OutputPath $payloadTarget.Target -Configuration $Configuration
     }
 
     Copy-Item -Path $invokerSource -Destination $invokerTarget -Force
     Copy-Item -Path $solidWorksLoaderSource -Destination $solidWorksLoaderTarget -Force
     Copy-Item -Path $solidWorksEnsureSource -Destination $solidWorksEnsureTarget -Force
+    Write-BomPipeBuildManifest -InstallRoot $InstallRoot -Configuration $Configuration -PayloadTargets $payloadTargets
 }
 
 function Get-BomPipeInstalledComHostPath {
